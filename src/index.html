@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Munin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f11;--s1:#16161a;--s2:#1c1c22;--s3:#242430;
+  --b1:rgba(255,255,255,0.06);--b2:rgba(255,255,255,0.11);
+  --t1:#e8e8f0;--t2:#9898b0;--t3:#55556a;
+  --am:#f59e0b;--am-d:rgba(245,158,11,0.13);
+  --red:#f87171;--green:#4ade80;--blue:#60a5fa;--purple:#a78bfa;
+  --r:10px;--rs:7px;
+}
+html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:var(--bg);color:var(--t1);font-size:14px;-webkit-user-select:none;user-select:none}
+
+.app{display:flex;flex-direction:column;height:100vh}
+.titlebar{height:38px;background:var(--s1);-webkit-app-region:drag;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--b1);flex-shrink:0}
+.titlebar span{font-size:12px;color:var(--t3);font-family:'JetBrains Mono',monospace;pointer-events:none}
+.body{display:grid;grid-template-columns:220px minmax(0,1fr);flex:1;overflow:hidden}
+
+/* SIDEBAR */
+.sb{width:220px;min-width:220px;background:var(--s1);border-right:1px solid var(--b1);display:flex;flex-direction:column;min-height:0}
+.sb-logo{padding:16px 16px 12px;border-bottom:1px solid var(--b1)}
+.logo-t{font-size:19px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,#f59e0b,#fcd34d);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-s{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.sb-scroll{flex:1;overflow-y:auto;padding:6px 0}
+.sb-scroll::-webkit-scrollbar{width:0}
+.sec-lbl{padding:10px 14px 3px;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.08em;text-transform:uppercase}
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:10px 10px 3px 14px}
+.sec-head .sec-lbl{padding:0}
+.mini-btn{width:22px;height:22px;border-radius:5px;border:1px solid var(--b1);background:var(--s2);color:var(--t3);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.mini-btn:hover{background:var(--s3);color:var(--t1)}
+.nav{display:flex;align-items:center;gap:9px;padding:8px 12px 8px 16px;cursor:pointer;font-size:13px;font-weight:500;color:var(--t2);border:none;background:none;width:100%;text-align:left;position:relative;transition:all .15s;-webkit-app-region:no-drag}
+.nav:hover{background:var(--s2);color:var(--t1)}
+.nav.on{background:var(--am-d);color:var(--am)}
+.nav.on::before{content:'';position:absolute;left:0;top:5px;bottom:5px;width:3px;background:var(--am);border-radius:0 3px 3px 0}
+.bdg{margin-left:auto;font-size:10px;font-family:'JetBrains Mono',monospace;background:rgba(248,113,113,.2);color:var(--red);padding:1px 6px;border-radius:20px;font-weight:600}
+.lst-btn{display:flex;align-items:center;gap:9px;padding:6px 12px 6px 16px;cursor:pointer;font-size:13px;font-weight:500;color:var(--t2);border:none;background:none;width:100%;text-align:left;transition:all .15s;-webkit-app-region:no-drag}
+.lst-btn:hover{background:var(--s2);color:var(--t1)}
+.lst-btn.on{color:var(--t1)}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.lst-cnt{margin-left:auto;font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.sb-foot{padding:12px 14px;border-top:1px solid var(--b1);margin-top:auto}
+.prog-row{display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:5px}
+.prog-am{color:var(--am);font-family:'JetBrains Mono',monospace;font-weight:600}
+.prog-track{height:3px;background:var(--s3);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--am),#fcd34d);border-radius:2px;transition:width .4s}
+.save-ind{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;text-align:center;padding-top:7px}
+.save-ok{color:var(--green)}
+
+/* MAIN */
+.main{width:100%;min-width:0;display:flex;flex-direction:column;overflow-y:auto}
+.main::-webkit-scrollbar{width:3px}
+.main::-webkit-scrollbar-thumb{background:var(--s3);border-radius:2px}
+.topbar{padding:16px 22px 0;border-bottom:1px solid var(--b1);flex-shrink:0}
+.tb-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.tb-title{font-size:21px;font-weight:800;letter-spacing:-.5px}
+.tb-date{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.tb-actions{display:flex;gap:6px}
+.ic-btn{height:29px;padding:0 10px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s1);cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--t2);font-size:12px;font-family:'Syne',sans-serif;font-weight:500;transition:all .15s;-webkit-app-region:no-drag}
+.ic-btn:hover{background:var(--s2);color:var(--t1)}
+.view-tabs{display:flex}
+.vtab{padding:7px 15px;font-size:12.5px;font-weight:600;color:var(--t3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .15s;font-family:'Syne',sans-serif;-webkit-app-region:no-drag}
+.vtab:hover{color:var(--t2)}
+.vtab.on{color:var(--am);border-bottom-color:var(--am)}
+
+/* LIST VIEW */
+.list-view{flex:1;overflow-y:auto;padding:10px 20px 6px}
+.list-view::-webkit-scrollbar{width:3px}
+.list-view::-webkit-scrollbar-thumb{background:var(--s3);border-radius:2px}
+.sec-t{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;padding:8px 0 5px}
+
+/* TASK CARD */
+.tc{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--r);border:1px solid var(--b1);background:var(--s1);margin-bottom:4px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden}
+.tc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;opacity:0;transition:opacity .18s;border-radius:3px 0 0 3px}
+.prio-high::before{background:var(--red)}
+.prio-medium::before{background:#fbbf24}
+.prio-low::before{background:var(--green)}
+.tc:hover{background:var(--s2);border-color:var(--b2);transform:translateY(-1px)}
+.tc:hover::before{opacity:1}
+.tc.sel{border-color:var(--am);background:var(--s2)}
+.tc.sel::before{opacity:1}
+.tc.done-c{opacity:.42}
+.tc.drag-on{opacity:.3;transform:scale(.97)}
+.tc.drag-ov{border-color:var(--am);box-shadow:0 0 0 1px var(--am)}
+.ph{width:18px;height:18px;border-radius:50%;flex-shrink:0;border:1.5px solid var(--b2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .18s;margin-top:1px;color:var(--bg)}
+.ph:hover{border-color:var(--am)}
+.ph.ck{background:var(--am);border-color:var(--am)}
+.tb2{flex:1;min-width:0}
+.tt{font-size:13.5px;font-weight:500;line-height:1.35;color:var(--t1)}
+.tt.dk{text-decoration:line-through;color:var(--t3)}
+.meta{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap}
+.lchip{font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px}
+.due-chip{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.due-chip.overdue{color:var(--red)}
+.pdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:inline-block}
+.att-mc{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--blue);font-family:'JetBrains Mono',monospace}
+.note-mc{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--purple);font-family:'JetBrains Mono',monospace}
+.sub-mc{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.tah{display:flex;gap:3px;opacity:0;transition:opacity .15s;flex-shrink:0}
+.tc:hover .tah,.tc.sel .tah{opacity:1}
+.act-btn{width:24px;height:24px;border-radius:5px;border:1px solid var(--b1);background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:12px;transition:all .15s}
+.act-btn:hover{background:var(--s3);color:var(--t1)}
+.act-btn.del:hover{background:rgba(248,113,113,.15);color:var(--red)}
+
+/* SUBTASKS */
+.sub-list{margin-top:7px;padding-top:7px;border-top:1px solid var(--b1)}
+.sub-item{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;color:var(--t2)}
+.sub-text{flex:1;min-width:0}
+.sub-ck{width:12px;height:12px;border-radius:3px;border:1px solid var(--b2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:8px;transition:all .15s;flex-shrink:0;background:transparent;color:var(--bg)}
+.sub-ck:hover{border-color:var(--am)}
+.sub-ck.ck{background:var(--am);border-color:var(--am)}
+.sub-edit-btn{padding:2px 7px;border-radius:5px;border:1px solid var(--b1);background:var(--s2);color:var(--t3);font-size:11px;cursor:pointer;font-family:'Syne',sans-serif;transition:all .15s;flex-shrink:0}
+.sub-edit-btn:hover{background:var(--s3);color:var(--t1)}
+.sub-edit-btn.primary{border-color:var(--am);background:var(--am-d);color:var(--am)}
+.sub-edit-main{flex:1;min-width:0}
+.sub-edit-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.sub-edit-error{font-size:11px;color:var(--red);margin-top:3px}
+.add-sub{display:flex;gap:5px;margin-top:6px}
+.sub-inp{flex:1;padding:3px 7px;border-radius:5px;border:1px solid var(--b2);background:var(--s3);color:var(--t1);font-size:12px;font-family:'Syne',sans-serif;outline:none}
+.sub-inp:focus{border-color:var(--am)}
+.sub-inp::placeholder{color:var(--t3)}
+.sub-add-btn{padding:3px 9px;border-radius:5px;border:1px solid var(--am);background:var(--am-d);color:var(--am);font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;transition:all .15s}
+.sub-add-btn:hover{background:var(--am);color:#0f0f11}
+
+/* ADD AREA */
+.add-area{padding:8px 20px 14px;border-top:1px solid var(--b1);flex-shrink:0}
+.af{display:flex;align-items:center;gap:10px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);padding:8px 12px;transition:border-color .18s}
+.af:focus-within{border-color:var(--am);box-shadow:0 0 0 3px var(--am-d)}
+.ai{flex:1;background:none;border:none;outline:none;font-size:14px;color:var(--t1);font-family:'Syne',sans-serif;font-weight:500;-webkit-user-select:text;user-select:text}
+.ai::placeholder{color:var(--t3)}
+.as-row{display:flex;gap:7px;margin-top:7px;align-items:center;flex-wrap:wrap}
+.ms{padding:4px 8px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:12px;font-family:'Syne',sans-serif;outline:none;cursor:pointer;transition:all .15s}
+.ms:focus{border-color:var(--am);color:var(--t1)}
+.add-b{padding:6px 16px;border-radius:var(--rs);border:none;background:var(--am);color:#0f0f11;font-size:13px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;transition:all .15s;margin-left:auto}
+.add-b:hover{background:#fcd34d;transform:translateY(-1px)}
+.add-b:active{transform:none}
+.clip-btn{width:30px;height:30px;border-radius:var(--rs);border:1px solid var(--b2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:15px;transition:all .15s}
+.clip-btn:hover{background:var(--s2);color:var(--blue)}
+
+/* 7-DAY VIEW */
+.week-view{flex:0 0 auto;display:flex;flex-direction:column;overflow:visible;min-height:0}
+.week-nav-bar{display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--b1);flex-shrink:0}
+.wn-btn{width:26px;height:26px;border-radius:5px;border:1px solid var(--b2);background:var(--s2);cursor:pointer;color:var(--t2);font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.wn-btn:hover{background:var(--s3);color:var(--t1)}
+.wn-lbl{font-size:12px;color:var(--t2);font-family:'JetBrains Mono',monospace;min-width:110px;text-align:center}
+.wn-today{padding:3px 10px;border-radius:5px;border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:11px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:500;transition:all .15s}
+.wn-today:hover{background:var(--s3);color:var(--t1)}
+.week-scroll{flex:none;overflow-x:auto;overflow-y:visible}
+.week-scroll::-webkit-scrollbar{height:3px}
+.week-scroll::-webkit-scrollbar-thumb{background:var(--s3)}
+.week-cols{display:flex;align-items:stretch;padding:12px 16px;gap:9px;min-width:max-content}
+.day-col{width:210px;min-height:360px;flex-shrink:0;display:flex;flex-direction:column;background:var(--s1);border-radius:var(--r);border:1px solid var(--b1);overflow:visible}
+.day-col.today-col{border-color:rgba(245,158,11,.35)}
+.day-col.drop-day{border-color:var(--am);box-shadow:0 0 0 1px var(--am);background:rgba(245,158,11,.06)}
+.day-head{padding:10px 11px 8px;border-bottom:1px solid var(--b1);flex-shrink:0}
+.day-name{font-size:13px;font-weight:700;color:var(--t1)}
+.day-name.today-nm{color:var(--am)}
+.day-wd{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.day-tasks{flex:1 0 auto;overflow:visible;padding:5px 7px}
+.day-task{display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border-radius:7px;border:1px solid var(--b1);background:var(--s2);margin-bottom:3px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.day-task::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;border-radius:2px 0 0 2px}
+.day-task.ph-high::before{background:var(--red)}
+.day-task.ph-medium::before{background:#fbbf24}
+.day-task.ph-low::before{background:var(--green)}
+.day-task:hover{background:var(--s3)}
+.day-task.sel,.cdp-task.sel{border-color:var(--am);background:var(--s3)}
+.cal-pill.sel{outline:1px solid var(--am);box-shadow:0 0 0 1px var(--am-d)}
+.day-task.done-dt{opacity:.4}
+.d-ph{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--b2);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:8px;margin-top:1px;background:transparent;transition:all .15s;color:var(--bg)}
+.d-ph:hover{border-color:var(--am)}
+.d-ph.ck{background:var(--am);border-color:var(--am)}
+.d-tt{font-size:12px;font-weight:500;color:var(--t1);line-height:1.3;flex:1}
+.d-tt.dk{text-decoration:line-through;color:var(--t3)}
+.day-add{display:flex;align-items:center;gap:6px;padding:7px 10px;color:var(--t3);cursor:pointer;font-size:12px;border-top:1px solid var(--b1);transition:color .15s;flex-shrink:0}
+.day-add:hover{color:var(--t2)}
+.day-add-inp{flex:1;background:none;border:none;outline:none;font-size:12px;color:var(--t1);font-family:'Syne',sans-serif;-webkit-user-select:text;user-select:text}
+.day-add-inp::placeholder{color:var(--t3)}
+
+/* CALENDAR VIEW */
+.cal-view{flex:0 0 auto;display:flex;flex-direction:column;overflow:visible}
+.cal-header{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--b1);flex-shrink:0}
+.cal-nav{width:28px;height:28px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);cursor:pointer;color:var(--t2);font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.cal-nav:hover{background:var(--s3);color:var(--t1)}
+.cal-m-lbl{font-size:16px;font-weight:700;min-width:160px}
+.cal-today-b{padding:4px 12px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:500;transition:all .15s}
+.cal-today-b:hover{background:var(--s3);color:var(--t1)}
+.cal-wrap{flex:1;overflow:hidden;padding:0 16px 12px;display:flex;flex-direction:column}
+.cal-grid-col{flex:1;overflow:hidden;padding:0 16px 12px;display:flex;flex-direction:column}
+.cal-wds{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.cal-wd{text-align:center;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.06em;padding:4px 0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr);gap:2px;flex:1}
+.cal-cell{border-radius:8px;border:1px solid var(--b1);background:var(--s1);padding:5px 6px;display:flex;flex-direction:column;overflow:hidden;cursor:pointer;transition:background .15s;min-height:0}
+.cal-cell:hover{background:var(--s2)}
+.cal-cell.drop-day{border-color:var(--am);box-shadow:inset 0 0 0 1px var(--am);background:rgba(245,158,11,.08)}
+.cal-cell.other{opacity:.3}
+.cal-cell.today-c{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.06)}
+.cal-cell.sel-c{border-color:var(--am)}
+.cal-dn{font-size:11px;font-weight:600;color:var(--t2);margin-bottom:2px;line-height:1}
+.cal-cell.today-c .cal-dn{color:var(--am)}
+.cal-pill{font-size:10px;padding:1px 4px;border-radius:3px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;line-height:1.4;cursor:grab}
+.cal-more{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+
+/* CAL BODY — сетка и выбранный день в вертикальном потоке */
+.cal-body{flex:0 0 auto;overflow:visible;display:flex;flex-direction:column;gap:0;min-height:0}
+.cal-grid-col{flex:1;overflow:hidden;padding:0 16px 12px;display:flex;flex-direction:column;min-width:0;min-height:360px}
+
+/* DAY PANEL */
+.cal-day-panel{width:100%;min-height:220px;background:var(--s1);border-top:1px solid var(--b1);display:flex;flex-direction:column;overflow:visible;flex-shrink:0}
+.cdp-head{padding:16px 16px 10px;border-bottom:1px solid var(--b1);flex-shrink:0}
+.cdp-title{font-size:17px;font-weight:800;letter-spacing:-.5px;color:var(--t1)}
+.cdp-sub{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:2px;text-transform:capitalize}
+.cdp-tasks{flex:1;overflow-y:auto;padding:8px 10px}
+.cdp-tasks::-webkit-scrollbar{width:2px}
+.cdp-tasks::-webkit-scrollbar-thumb{background:var(--s3)}
+.cdp-task{display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-radius:8px;border:1px solid var(--b1);background:var(--s2);margin-bottom:4px;cursor:pointer;transition:all .15s}
+.cdp-task:hover{background:var(--s3);border-color:var(--b2)}
+.cdp-task.cdp-done{opacity:.42}
+.cdp-task-t{font-size:13px;font-weight:500;color:var(--t1);line-height:1.35}
+.cdp-task-t.dk{text-decoration:line-through;color:var(--t3)}
+.cdp-empty{text-align:center;padding:30px 0;color:var(--t3);font-size:22px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.cdp-empty div{font-size:13px}
+.cdp-hint{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--t3);font-size:14px;text-align:center;padding:20px}
+.cdp-add{padding:10px 12px 14px;border-top:1px solid var(--b1);flex-shrink:0}
+.cdp-add-row{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:7px 10px;transition:border-color .18s}
+.cdp-add-row:focus-within{border-color:var(--am);box-shadow:0 0 0 3px var(--am-d)}
+.cdp-inp{flex:1;background:none;border:none;outline:none;font-size:13px;color:var(--t1);font-family:'Syne',sans-serif;font-weight:500;-webkit-user-select:text;user-select:text}
+.cdp-inp::placeholder{color:var(--t3)}
+.cdp-add-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:7px}
+.cdp-add-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:7px}
+.cdp-add-error{font-size:11px;color:var(--red);margin-top:6px}
+.cdp-cancel{padding:5px 12px;border-radius:var(--rs);border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:12px;cursor:pointer;font-family:'Syne',sans-serif}
+.cdp-cancel:hover{background:var(--s2);color:var(--t1)}
+
+/* DETAIL FORM FIELDS */
+.dp-lbl{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.dp-sel{width:100%;padding:6px 9px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);color:var(--t1);font-size:12px;font-family:'Syne',sans-serif;outline:none;margin-bottom:10px}
+.dp-sel:focus{border-color:var(--am)}
+.dp-date{width:100%;padding:6px 9px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);color:var(--t1);font-size:12px;font-family:'Syne',sans-serif;outline:none;color-scheme:dark;margin-bottom:10px}
+.dp-date:focus{border-color:var(--am)}
+.dp-sep{height:1px;background:var(--b1);margin:4px 0 10px}
+
+/* ATTACHMENTS */
+.att-drop{border:1.5px dashed var(--b2);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;transition:all .18s}
+.att-drop:hover,.att-drop-hover{border-color:var(--am);background:var(--am-d)}
+.att-drop-ic{font-size:22px;color:var(--t3);margin-bottom:5px}
+.att-drop-txt{font-size:12px;color:var(--t3)}
+.att-drop-sub{font-size:10px;color:var(--t3);margin-top:2px;font-family:'JetBrains Mono',monospace}
+.att-list{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.att-item{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;border:1px solid var(--b1);background:var(--s2);cursor:pointer;transition:all .15s}
+.att-item:hover{background:var(--s3);border-color:var(--b2)}
+.att-thumb{width:34px;height:34px;border-radius:6px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--s3)}
+.att-thumb img{width:100%;height:100%;object-fit:cover}
+.att-info{flex:1;min-width:0}
+.att-name{font-size:12px;font-weight:500;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-size{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.att-del{width:20px;height:20px;border-radius:4px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:12px;transition:all .15s;opacity:0;flex-shrink:0}
+.att-item:hover .att-del{opacity:1}
+.att-del:hover{background:rgba(248,113,113,.15);color:var(--red)}
+.close-b{padding:7px 0;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;text-align:center;width:100%;transition:all .15s}
+.close-b:hover{background:var(--s3);color:var(--t1)}
+
+/* FILE VIEWER */
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;z-index:999}
+.viewer-box{background:var(--s1);border-radius:14px;border:1px solid var(--b2);width:700px;height:560px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.viewer-head{padding:12px 14px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.viewer-title{font-size:13px;font-weight:600;color:var(--t1);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewer-close{width:26px;height:26px;border-radius:6px;border:1px solid var(--b2);background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t2);font-size:13px;transition:all .15s}
+.viewer-close:hover{background:var(--s3);color:var(--t1)}
+.viewer-body{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:12px;background:var(--bg);min-height:0}
+.viewer-img{max-width:100%;max-height:380px;border-radius:8px;object-fit:contain}
+.viewer-generic{text-align:center;padding:30px}
+.viewer-generic-ic{font-size:48px;margin-bottom:12px}
+.viewer-generic-name{font-size:15px;font-weight:600;color:var(--t1);margin-bottom:4px}
+.viewer-generic-info{font-size:12px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.viewer-text{width:100%;height:100%;white-space:pre-wrap;word-break:break-word;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.5;color:var(--t1);background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:12px;-webkit-user-select:text;user-select:text}
+.viewer-doc{width:100%;height:100%;overflow:auto;background:#f6f4ef;color:#18181b;border-radius:8px;padding:24px 28px;font-size:14px;line-height:1.55;-webkit-user-select:text;user-select:text}
+.viewer-doc h1,.viewer-doc h2,.viewer-doc h3{margin:12px 0 8px;color:#111827}
+.viewer-doc p{margin:0 0 10px}
+.viewer-doc table{border-collapse:collapse;margin:12px 0;width:100%}
+.viewer-doc td,.viewer-doc th{border:1px solid #c8c2b8;padding:6px 8px;vertical-align:top}
+.viewer-table-wrap{width:100%;height:100%;overflow:auto;background:var(--s1);border:1px solid var(--b1);border-radius:8px}
+.viewer-table-meta{position:sticky;top:0;background:var(--s2);border-bottom:1px solid var(--b1);padding:7px 10px;font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace;z-index:1}
+.viewer-table{border-collapse:collapse;width:max-content;min-width:100%;font-family:'JetBrains Mono',monospace;font-size:11px}
+.viewer-table td{border:1px solid var(--b1);padding:5px 7px;min-width:80px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t2)}
+.viewer-table tr:first-child td{background:rgba(255,255,255,.04);color:var(--t1);font-weight:600}
+.viewer-error{margin-top:14px;font-size:12px;color:var(--red);line-height:1.4;max-width:440px}
+.viewer-foot{padding:10px 14px;border-top:1px solid var(--b1);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.v-btn{padding:6px 14px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:500;transition:all .15s}
+.v-btn:hover{background:var(--s3);color:var(--t1)}
+.v-btn.primary{background:var(--am);border-color:var(--am);color:#0f0f11}
+.v-btn.primary:hover{background:#fcd34d}
+
+.empty{text-align:center;padding:50px 0;color:var(--t3)}
+.empty-ic{font-size:32px;margin-bottom:10px}
+.bottom-detail,.task-details-bottom{width:100%;box-sizing:border-box;margin-top:16px;position:static;display:block;grid-column:auto;border-top:1px solid var(--b1);background:var(--s1);padding:24px 20px 18px;flex-shrink:0}
+.bottom-detail.empty-detail{min-height:150px;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:13px}
+.detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.detail-title{font-size:16px;font-weight:800;line-height:1.35;color:var(--t1)}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px}
+.detail-field{min-width:0}
+.detail-section{border-top:1px solid var(--b1);padding-top:12px;margin-top:12px}
+.detail-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.detail-preview-list{display:flex;flex-direction:column;gap:10px}
+.note-textarea{width:100%;min-height:120px;max-height:220px;resize:vertical;border:1px solid var(--b2);border-radius:var(--r);background:var(--s2);color:var(--t1);padding:10px 12px;font-size:13px;line-height:1.45;font-family:'Syne',sans-serif;outline:none;-webkit-user-select:text;user-select:text}
+.note-textarea:focus{border-color:var(--am);box-shadow:0 0 0 3px var(--am-d)}
+.note-textarea::placeholder{color:var(--t3)}
+.preview-card{border:1px solid var(--b1);background:var(--s2);border-radius:8px;overflow:hidden;cursor:grab}
+.preview-card:active{cursor:grabbing}
+.preview-card-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--b1)}
+.preview-card-title{flex:1;min-width:0}
+.preview-card-name{font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preview-card-meta{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.preview-card-actions{display:flex;gap:6px;flex-shrink:0}
+.preview-card-drag{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.preview-body{max-height:420px;overflow:auto;padding:10px;background:var(--bg)}
+.preview-body.expanded{max-height:720px}
+.preview-body .viewer-img{max-height:360px}
+.preview-body .viewer-doc,.preview-body .viewer-text,.preview-body .viewer-table-wrap{height:auto;min-height:160px;max-height:none}
+.preview-loading{padding:28px;text-align:center;color:var(--t3);font-size:12px;font-family:'JetBrains Mono',monospace}
+.detail-drop{margin-top:8px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-box{width:480px;max-width:calc(100vw - 32px);max-height:86vh;background:var(--s1);border:1px solid var(--b2);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.modal-head{padding:13px 15px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:10px}
+.modal-title{font-size:15px;font-weight:700;flex:1}
+.modal-body{padding:14px;overflow:auto}
+.list-row{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;margin-bottom:7px}
+.list-inp{width:100%;padding:7px 9px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);color:var(--t1);font-size:13px;font-family:'Syne',sans-serif;outline:none;-webkit-user-select:text;user-select:text}
+.list-inp:focus{border-color:var(--am)}
+.list-help{font-size:11px;color:var(--t3);line-height:1.4;margin-top:8px}
+.list-error{font-size:12px;color:var(--red);margin-top:8px;line-height:1.4}
+@keyframes si{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.tc,.day-task{animation:si .16s ease}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="../node_modules/react/umd/react.production.min.js"></script>
+<script src="../node_modules/react-dom/umd/react-dom.production.min.js"></script>
+<script>
+const {useState,useRef,useEffect,useCallback,useMemo}=React;
+const h=React.createElement;
+
+const DEFAULT_LISTS=[
+  {id:'work',name:'Работа',accent:'#f59e0b',bg:'rgba(245,158,11,0.13)'},
+  {id:'personal',name:'Личное',accent:'#10b981',bg:'rgba(16,185,129,0.13)'},
+  {id:'study',name:'Учёба',accent:'#60a5fa',bg:'rgba(96,165,250,0.13)'},
+  {id:'health',name:'Здоровье',accent:'#a78bfa',bg:'rgba(167,139,250,0.13)'},
+];
+const SYSTEM_LIST={id:'unlisted',name:'Без списка',accent:'#9898b0',bg:'rgba(152,152,176,0.13)',system:true};
+const RESERVED_LIST_IDS=new Set(['today','upcoming','all','done','unlisted']);
+const LIST_COLORS=[
+  ['#f59e0b','rgba(245,158,11,0.13)'],
+  ['#10b981','rgba(16,185,129,0.13)'],
+  ['#60a5fa','rgba(96,165,250,0.13)'],
+  ['#a78bfa','rgba(167,139,250,0.13)'],
+  ['#f87171','rgba(248,113,113,0.13)'],
+  ['#22c55e','rgba(34,197,94,0.13)']
+];
+const PRIO_C={high:'#f87171',medium:'#fbbf24',low:'#4ade80'};
+const RU_MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const RU_WD=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const RU_WD_LONG=['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
+
+let _id=100; const uid=()=>++_id;
+const pad2=n=>String(n).padStart(2,'0');
+const tod=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+function parseLocalDate(dateString){
+  if(!dateString)return null;
+  if(dateString instanceof Date)return new Date(dateString.getFullYear(),dateString.getMonth(),dateString.getDate());
+  const [y,m,d]=String(dateString).split('-').map(Number);
+  if(!y||!m||!d)return null;
+  return new Date(y,m-1,d);
+}
+function formatLocalDate(date){
+  if(!date)return'';
+  const d=date instanceof Date?date:parseLocalDate(date);
+  if(!d||Number.isNaN(d.getTime()))return'';
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+const toDS=d=>formatLocalDate(d);
+const addD=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
+const sameD=(a,b)=>{const ad=parseLocalDate(a),bd=parseLocalDate(b);return !!ad&&!!bd&&formatLocalDate(ad)===formatLocalDate(bd)};
+function compareDateStringsLocal(a,b){
+  const ad=parseLocalDate(a),bd=parseLocalDate(b);
+  if(!ad&&!bd)return 0;
+  if(!ad)return -1;
+  if(!bd)return 1;
+  const av=formatLocalDate(ad),bv=formatLocalDate(bd);
+  return av===bv?0:av<bv?-1:1;
+}
+const isTodayDateString=dateString=>compareDateStringsLocal(dateString,toDS(tod()))===0;
+const isFutureDateString=dateString=>!!dateString&&compareDateStringsLocal(dateString,toDS(tod()))>0;
+const fmtD=d=>{const ld=parseLocalDate(d);return ld?ld.toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):''};
+const fmtWeekday=d=>{const ld=parseLocalDate(d);return ld?ld.toLocaleDateString('ru-RU',{weekday:'long'}):''};
+const fmtSz=b=>{if(b>1048576)return(b/1048576).toFixed(1)+' MB';if(b>1024)return Math.round(b/1024)+' KB';return b+' B'};
+const attName=f=>f?.originalName||f?.name||'Вложение';
+const attachmentIcon=att=>{
+  const ext=(att?.ext||'').toLowerCase();
+  const isImg=['png','jpg','jpeg','gif','webp'].includes(ext);
+  return isImg?'🖼':ext==='pdf'?'📄':ext==='docx'||ext==='doc'?'📝':['xlsx','xls','csv'].includes(ext)?'📊':['txt','md','json','xml','html','htm','css','js','ts','log','rtf'].includes(ext)?'📝':'📎';
+};
+const taskDate=t=>t.date||t.dueDate||'';
+const taskTime=t=>t.dueTime||'';
+const taskNote=t=>typeof t?.note==='string'?t.note:(typeof t?.description==='string'?t.description:'');
+const isTaskDone=t=>!!(t?.done||t?.completed||t?.checked);
+function formatCalcValue(value){
+  const normalized=Math.abs(value)<1e-12?0:value;
+  return Number.isInteger(normalized)?String(normalized):String(Number(normalized.toFixed(10)));
+}
+function evaluateArithmeticFormula(input){
+  const original=String(input||'').trim();
+  const expr=(original.startsWith('=')?original.slice(1):original).trim();
+  if(!expr)return{ok:false,error:'Введите выражение.'};
+  let pos=0;
+  const skip=()=>{while(pos<expr.length&&/\s/.test(expr[pos]))pos++;};
+  const fail=message=>{throw new Error(message);};
+  const parseExpression=()=>{
+    let value=parseTerm();
+    while(true){
+      skip();
+      const op=expr[pos];
+      if(op!=='+'&&op!=='-')break;
+      pos++;
+      const right=parseTerm();
+      value=op==='+'?value+right:value-right;
+    }
+    return value;
+  };
+  const parseTerm=()=>{
+    let value=parseFactor();
+    while(true){
+      skip();
+      const op=expr[pos];
+      if(op!=='*'&&op!=='/')break;
+      pos++;
+      const right=parseFactor();
+      if(op==='/'&&Math.abs(right)<1e-12)fail('Деление на ноль недоступно.');
+      value=op==='*'?value*right:value/right;
+    }
+    return value;
+  };
+  const parseFactor=()=>{
+    skip();
+    const ch=expr[pos];
+    if(ch==='+'||ch==='-'){
+      pos++;
+      const value=parseFactor();
+      return ch==='-'?-value:value;
+    }
+    if(ch==='('){
+      pos++;
+      const value=parseExpression();
+      skip();
+      if(expr[pos]!==')')fail('Закройте скобку.');
+      pos++;
+      return value;
+    }
+    return parseNumber();
+  };
+  const parseNumber=()=>{
+    skip();
+    const start=pos;
+    let sawDigit=false;
+    while(pos<expr.length&&/\d/.test(expr[pos])){pos++;sawDigit=true;}
+    if(expr[pos]==='.'){
+      pos++;
+      while(pos<expr.length&&/\d/.test(expr[pos])){pos++;sawDigit=true;}
+    }
+    if(!sawDigit)fail('Используйте только числа, операторы и скобки.');
+    const value=Number(expr.slice(start,pos));
+    if(!Number.isFinite(value))fail('Некорректное число.');
+    return value;
+  };
+  try{
+    const value=parseExpression();
+    skip();
+    if(pos!==expr.length)return{ok:false,error:'Некорректное выражение.'};
+    if(!Number.isFinite(value))return{ok:false,error:'Некорректный результат.'};
+    return{ok:true,value:formatCalcValue(value)};
+  }catch(e){
+    return{ok:false,error:e.message||'Некорректное выражение.'};
+  }
+}
+function looksLikeInlineFormula(expr){
+  const text=String(expr||'').trim();
+  if(!text||!/\d/.test(text))return false;
+  if(!/^[\d\s+\-*/().]+$/.test(text))return false;
+  const compact=text.replace(/\s+/g,'');
+  if(/^\d{4}-\d{1,2}-\d{1,2}$/.test(compact))return false;
+  if(/^\d{1,2}-\d{1,2}-\d{4}$/.test(compact))return false;
+  if(/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(compact))return false;
+  if(/^\d{1,2}\/\d{4}$/.test(compact))return false;
+  if(/^[+-]?\s*(?:\d+(?:\.\d*)?|\.\d+)$/.test(text))return false;
+  if(/[+*/]/.test(compact))return true;
+  if(/[()]/.test(compact)&&/[+\-*/]/.test(compact))return true;
+  for(let i=1;i<compact.length;i++){
+    if(compact[i]==='-'&&/[\d.)]/.test(compact[i-1])&&/[\d.(]/.test(compact[i+1]||''))return true;
+  }
+  return false;
+}
+function applyInlineNoteFormula(value, caret){
+  const text=String(value||'');
+  if(!Number.isInteger(caret)||caret<1||text[caret-1]!=='=')return null;
+  const lineStart=text.lastIndexOf('\n',caret-2)+1;
+  const expr=text.slice(lineStart,caret-1).trim();
+  if(!looksLikeInlineFormula(expr))return null;
+  const result=evaluateArithmeticFormula(expr);
+  if(!result.ok)return null;
+  if(text.slice(caret,caret+result.value.length)===result.value)return null;
+  const next=text.slice(0,caret)+result.value+text.slice(caret);
+  return{value:next,caret:caret+result.value.length};
+}
+const localDateTimeMs=(dateString,timeString='00:00')=>{
+  const d=parseLocalDate(dateString);
+  if(!d)return NaN;
+  const [h,m]=String(timeString||'00:00').split(':').map(Number);
+  d.setHours(Number.isFinite(h)?h:0,Number.isFinite(m)?m:0,0,0);
+  return d.getTime();
+};
+const nowIso=()=>new Date().toISOString();
+const slugList=s=>(s||'').toString().trim().toLowerCase()
+  .replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-+|-+$/g,'').slice(0,32)||'list';
+const listLabel=l=>l?.name||l?.label||'Без списка';
+function listById(lists,id){return [...lists,SYSTEM_LIST].find(l=>l.id===id)||SYSTEM_LIST}
+function resolveListId(value,lists){
+  if(!value)return SYSTEM_LIST.id;
+  const raw=String(value);
+  const found=[...lists,SYSTEM_LIST].find(l=>l.id===raw||listLabel(l)===raw);
+  return found?found.id:SYSTEM_LIST.id;
+}
+function uniqueListId(name,lists){
+  const base=slugList(name);
+  let id=RESERVED_LIST_IDS.has(base)?`list-${base}`:base;
+  const used=new Set(lists.map(l=>l.id));
+  let i=2;
+  while(used.has(id)||RESERVED_LIST_IDS.has(id))id=`${base}-${i++}`;
+  return id;
+}
+function getSidebarCounts(tasks){
+  return {
+    today:tasks.filter(t=>!isTaskDone(t)&&isTodayDateString(taskDate(t))).length,
+    upcoming:tasks.filter(t=>!isTaskDone(t)&&isFutureDateString(taskDate(t))).length,
+    all:tasks.filter(t=>!isTaskDone(t)).length,
+    done:tasks.filter(t=>isTaskDone(t)).length
+  };
+}
+function getTodayProgress(tasks){
+  const today=tasks.filter(t=>isTodayDateString(taskDate(t)));
+  const done=today.filter(isTaskDone).length;
+  return {total:today.length,done,pct:today.length?Math.round(done/today.length*100):0};
+}
+function fmtDue(t){
+  const d=taskDate(t); if(!d)return'';
+  const label=d===toDS(tod())?'Сегодня':fmtD(d);
+  return taskTime(t)?`${label} ${taskTime(t)}`:label;
+}
+function sortTasks(list){
+  return list.map((t,i)=>({t,i})).sort((a,b)=>{
+    const ad=taskDate(a.t), bd=taskDate(b.t);
+    if(ad!==bd)return ad.localeCompare(bd);
+    const at=taskTime(a.t), bt=taskTime(b.t);
+    if(at&&bt&&at!==bt)return at.localeCompare(bt);
+    if(at&&!bt)return -1;
+    if(!at&&bt)return 1;
+    return a.i-b.i;
+  }).map(x=>x.t);
+}
+
+const INIT=[
+  {id:1,text:'Подготовить презентацию',done:false,priority:'high',date:toDS(tod()),list:'work',
+   subs:[{id:101,text:'Собрать данные',done:true},{id:102,text:'Сделать слайды',done:false}],
+   attachments:[{id:'a1',name:'mockup_v3.png',ext:'png',size:2457600,path:''},{id:'a2',name:'brief_client.pdf',ext:'pdf',size:860160,path:''}]},
+  {id:2,text:'Позвонить в банк',done:false,priority:'medium',date:toDS(tod()),list:'personal',subs:[],attachments:[]},
+  {id:3,text:'Прочитать главу 5',done:true,priority:'low',date:toDS(tod()),list:'study',subs:[],attachments:[]},
+  {id:4,text:'Код-ревью PR',done:false,priority:'high',date:toDS(addD(tod(),1)),list:'work',subs:[{id:103,text:'Проверить тесты',done:false}],attachments:[]},
+  {id:5,text:'Купить продукты',done:false,priority:'low',date:toDS(addD(tod(),1)),list:'personal',subs:[],attachments:[]},
+  {id:6,text:'Настроить CI/CD',done:false,priority:'medium',date:toDS(addD(tod(),3)),list:'work',subs:[],attachments:[]},
+  {id:7,text:'Медитация 10 минут',done:false,priority:'low',date:toDS(tod()),list:'health',subs:[],attachments:[]},
+  {id:8,text:'Алгоритмы: деревья',done:false,priority:'medium',date:toDS(addD(tod(),5)),list:'study',subs:[],attachments:[]},
+];
+
+function normalizeLists(rawLists,rawTasks){
+  const byId=new Map();
+  const add=l=>{
+    const name=(listLabel(l)||'').trim();
+    if(!name)return;
+    const id=(l.id||uniqueListId(name,[...byId.values()])).toString();
+    if(id===SYSTEM_LIST.id)return;
+    const defaults=DEFAULT_LISTS.find(d=>d.id===id||d.name===name);
+    byId.set(id,{
+      id,
+      name,
+      accent:l.accent||defaults?.accent||LIST_COLORS[byId.size%LIST_COLORS.length][0],
+      bg:l.bg||defaults?.bg||LIST_COLORS[byId.size%LIST_COLORS.length][1],
+      createdAt:l.createdAt||nowIso(),
+      updatedAt:l.updatedAt||l.createdAt||nowIso()
+    });
+  };
+  (Array.isArray(rawLists)&&rawLists.length?rawLists:DEFAULT_LISTS).forEach(add);
+  (rawTasks||[]).forEach(t=>{
+    const raw=t.listId||t.list;
+    if(!raw)return;
+    if([...byId.values()].some(l=>l.id===raw||l.name===raw))return;
+    add({id:uniqueListId(raw,[...byId.values()]),name:String(raw)});
+  });
+  return [...byId.values()];
+}
+function migrateStorage(raw){
+  const isV2=raw&&typeof raw==='object'&&!Array.isArray(raw)&&Array.isArray(raw.tasks);
+  const rawTasks=Array.isArray(raw)?raw:(isV2?raw.tasks:INIT);
+  const lists=normalizeLists(isV2?raw.lists:null,rawTasks);
+  const tasks=rawTasks.map(t=>{
+    const done=isTaskDone(t);
+    return {...t,done,completed:done,note:taskNote(t),subs:t.subs||[],attachments:t.attachments||[],list:resolveListId(t.listId||t.list,lists)};
+  });
+  _id=Math.max(100,...tasks.map(t=>Number(t.id)||0))+1;
+  return {tasks,lists};
+}
+async function loadStorage(){
+  if(window.muninAPI){
+    const r=await window.muninAPI.loadTasks();
+    if(r.ok&&r.tasks)return migrateStorage(r.tasks);
+  }else{
+    try{const raw=localStorage.getItem('tf_tasks');if(raw)return migrateStorage(JSON.parse(raw));}catch(e){}
+  }
+  return migrateStorage(INIT);
+}
+async function saveStorage(tasks,lists){
+  const payload={version:2,tasks,lists};
+  if(window.muninAPI) await window.muninAPI.saveTasks(payload);
+  else try{localStorage.setItem('tf_tasks',JSON.stringify(payload));}catch(e){}
+}
+
+/* ── FILE VIEWER ── */
+function AttachmentPreviewContent({file,content,loading,error,extIcon,onOpen}){
+  if(loading)return h('div',{className:'preview-loading'},'Загрузка...');
+  if(content?.kind==='image')return h('img',{className:'viewer-img',src:'data:'+content.mime+';base64,'+content.data,alt:attName(file)});
+  if(content?.kind==='pdf')return h('iframe',{src:'data:application/pdf;base64,'+content.data+'#toolbar=1',
+    style:{width:'100%',height:'100%',minHeight:360,border:'none',borderRadius:8,background:'white',display:'block'}});
+  if(content?.kind==='text')return h('pre',{className:'viewer-text'},content.text+(content.truncated?'\n\n… '+(content.message||'предпросмотр обрезан'):''));
+  if(content?.kind==='html')return h('div',{className:'viewer-doc',dangerouslySetInnerHTML:{__html:content.html||''}});
+  if(content?.kind==='table'){
+    const rows=content.rows||[];
+    const meta=[
+      content.sheetName?'Лист: '+content.sheetName:null,
+      rows.length+' строк',
+      content.truncatedRows?'показаны первые '+content.rowLimit:null,
+      content.truncatedCols?'показаны первые '+content.colLimit+' столбцов':null
+    ].filter(Boolean).join(' · ');
+    return h('div',{className:'viewer-table-wrap'},
+      h('div',{className:'viewer-table-meta'},meta||'Таблица'),
+      rows.length
+        ? h('table',{className:'viewer-table'},
+            h('tbody',null,
+              rows.map((row,ri)=>h('tr',{key:ri},
+                row.map((cell,ci)=>h('td',{key:ci,title:String(cell??'')},String(cell??'')))
+              ))
+            )
+          )
+        : h('div',{className:'viewer-generic'},h('div',{className:'viewer-generic-info'},'В таблице нет данных для предпросмотра.'))
+    );
+  }
+  return h('div',{className:'viewer-generic'},
+    h('div',{className:'viewer-generic-ic'},extIcon||'📎'),
+    h('div',{className:'viewer-generic-name'},attName(file)),
+    h('div',{className:'viewer-generic-info'},fmtSz(file.size)+' · '+(file.ext||'?').toUpperCase()),
+    h('div',{style:{marginTop:12,color:'var(--t3)',fontSize:12}},
+      content?.message||'Предпросмотр для этого формата недоступен. Откройте файл в системе.'),
+    error&&h('div',{className:'viewer-error'},error),
+    onOpen&&h('div',{style:{marginTop:16}},
+      h('button',{className:'v-btn primary',style:{padding:'8px 20px'},onClick:onOpen},'Открыть в системе'))
+  );
+}
+
+function FileViewer({file,onClose}){
+  const[content,setContent]=useState(null);
+  const[error,setError]=useState('');
+  const[loading,setLoading]=useState(false);
+  const ext=(file.ext||'').toLowerCase();
+  const isImg=['png','jpg','jpeg','gif','webp'].includes(ext);
+  const isPdf=ext==='pdf';
+  const isXlsx=['xlsx','xls','csv'].includes(ext);
+  const isText=['txt','md','json','xml','html','htm','css','js','ts','log','rtf'].includes(ext);
+  const isWord=['docx','doc'].includes(ext);
+  const extIcon=isImg?'🖼':isPdf?'📄':isXlsx?'📊':(isText||isWord)?'📝':'📎';
+  const extColor=isImg?'var(--blue)':isPdf?'var(--red)':isXlsx?'var(--green)':'var(--t2)';
+
+  useEffect(()=>{
+    setContent(null);
+    setError('');
+    if(window.muninAPI){
+      setLoading(true);
+      window.muninAPI.readAttachment(file).then(r=>{
+        setLoading(false);
+        if(r.ok) setContent(r);
+        else setError(r.error||'Не удалось открыть предпросмотр.');
+      }).catch(()=>{
+        setLoading(false);
+        setError('Не удалось открыть предпросмотр.');
+      });
+    } else if(file.preview){
+      setContent({kind:isPdf?'pdf':'image',data:file.preview,mime:file.previewMime||'image/png'});
+    } else {
+      setContent({kind:'unsupported',message:'Предпросмотр для этого формата недоступен. Откройте файл в системе.'});
+    }
+  },[file.id]);
+
+  const openExternal=async()=>{
+    setError('');
+    if(!window.muninAPI){
+      setError('Открытие в системе доступно только в Electron-приложении.');
+      return;
+    }
+    const r=await window.muninAPI.openAttachment(file);
+    if(!r.ok) setError(r.error||'Не удалось открыть файл системным приложением.');
+  };
+
+  return h('div',{className:'viewer',onClick:e=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'viewer-box'},
+      h('div',{className:'viewer-head'},
+        h('span',{style:{fontSize:16,color:extColor}},extIcon),
+        h('span',{className:'viewer-title'},attName(file)),
+        h('span',{style:{fontSize:11,color:'var(--t3)',fontFamily:'JetBrains Mono,monospace',marginRight:8}},fmtSz(file.size)),
+        h('button',{className:'viewer-close',onClick:onClose},'✕')
+      ),
+      h('div',{className:'viewer-body'},h(AttachmentPreviewContent,{file,content,loading,error,extIcon,onOpen:openExternal})),
+      h('div',{className:'viewer-foot'},
+        error&&content?.kind!=='unsupported'&&h('span',{style:{marginRight:'auto',fontSize:12,color:'var(--red)',alignSelf:'center'}},error),
+        h('button',{className:'v-btn',onClick:onClose},'Закрыть'),
+        h('button',{className:'v-btn primary',onClick:openExternal},'Открыть в системе')
+      )
+    )
+  );
+}
+
+function ListManager({lists,tasks,onAdd,onRename,onDelete,onClose}){
+  const[draft,setDraft]=useState('');
+  const[edits,setEdits]=useState(()=>Object.fromEntries(lists.map(l=>[l.id,l.name])));
+  const[error,setError]=useState('');
+  useEffect(()=>{setEdits(Object.fromEntries(lists.map(l=>[l.id,l.name])));},[lists]);
+  const submitAdd=()=>{
+    const err=onAdd(draft);
+    setError(err);
+    if(!err)setDraft('');
+  };
+  const submitRename=id=>{
+    const err=onRename(id,edits[id]||'');
+    setError(err);
+  };
+  const submitDelete=id=>{
+    const err=onDelete(id);
+    setError(err);
+  };
+  return h('div',{className:'modal',onClick:e=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal-box'},
+      h('div',{className:'modal-head'},
+        h('div',{className:'modal-title'},'Управление списками'),
+        h('button',{className:'viewer-close',onClick:onClose},'✕')
+      ),
+      h('div',{className:'modal-body'},
+        lists.map(l=>{
+          const count=tasks.filter(t=>resolveListId(t.listId||t.list,lists)===l.id).length;
+          return h('div',{key:l.id,className:'list-row'},
+            h('input',{className:'list-inp',value:edits[l.id]??l.name,onChange:e=>setEdits(s=>({...s,[l.id]:e.target.value})),onKeyDown:e=>e.key==='Enter'&&submitRename(l.id)}),
+            h('button',{className:'v-btn',onClick:()=>submitRename(l.id)},'Сохранить'),
+            h('button',{className:'v-btn',title:count?'Сначала перенесите задачи из этого списка':'Удалить список',onClick:()=>submitDelete(l.id)},'Удалить')
+          );
+        }),
+        h('div',{className:'dp-sep',style:{margin:'12px 0'}}),
+        h('div',{className:'list-row',style:{gridTemplateColumns:'1fr auto'}},
+          h('input',{className:'list-inp',placeholder:'Новый список',value:draft,onChange:e=>setDraft(e.target.value),onKeyDown:e=>e.key==='Enter'&&submitAdd()}),
+          h('button',{className:'v-btn primary',onClick:submitAdd},'Добавить')
+        ),
+        h('div',{className:'list-help'},'“Без списка” создаётся автоматически для задач без группы и не редактируется здесь. Списки с задачами не удаляются, пока задачи не перенесены.'),
+        error&&h('div',{className:'list-error'},error)
+      )
+    )
+  );
+}
+
+function AttachmentPreviewCard({taskId,att,index,expanded,setExpanded,previewCache,setPreviewCache,onOpen,onShowInFinder,onStartDrag,onDelete}){
+  const id=att.id;
+  const isOpen=expanded[id]!==undefined?expanded[id]:index===0;
+  const cached=previewCache[id]||null;
+  useEffect(()=>{
+    if(!isOpen||cached||!window.muninAPI)return;
+    setPreviewCache(c=>({...c,[id]:{loading:true,content:null,error:''}}));
+    window.muninAPI.readAttachment(att).then(r=>{
+      setPreviewCache(c=>({...c,[id]:r.ok?{loading:false,content:r,error:''}:{loading:false,content:{kind:'unsupported',message:r.error||'Не удалось открыть предпросмотр.'},error:r.error||''}}));
+    }).catch(()=>{
+      setPreviewCache(c=>({...c,[id]:{loading:false,content:{kind:'unsupported',message:'Не удалось открыть предпросмотр.'},error:'Не удалось открыть предпросмотр.'}}));
+    });
+  },[isOpen,id]);
+  const remove=()=>{
+    onDelete(taskId,att);
+    setPreviewCache(c=>{const n={...c};delete n[id];return n;});
+    setExpanded(c=>{const n={...c};delete n[id];return n;});
+  };
+  return h('div',{
+    className:'preview-card',
+    draggable:true,
+    onDragStart:e=>onStartDrag?.(att,e),
+    title:'Перетащите файл в письмо или другое приложение'
+  },
+    h('div',{className:'preview-card-head'},
+      h('span',{style:{fontSize:18}},attachmentIcon(att)),
+      h('div',{className:'preview-card-title'},
+        h('div',{className:'preview-card-name'},attName(att)),
+        h('div',{className:'preview-card-meta'},fmtSz(att.size)+' · '+(att.ext||'?').toUpperCase()),
+        h('div',{className:'preview-card-drag'},'Можно перетащить в письмо или другое приложение')
+      ),
+      h('div',{className:'preview-card-actions'},
+        h('button',{className:'v-btn',onClick:e=>{e.stopPropagation();setExpanded(c=>({...c,[id]:!isOpen}))}},isOpen?'Свернуть':'Развернуть'),
+        h('button',{className:'v-btn',onClick:e=>{e.stopPropagation();onOpen(att)}},'Открыть'),
+        h('button',{className:'v-btn',onClick:e=>{e.stopPropagation();onShowInFinder?.(att)}},'Показать в Finder'),
+        h('button',{className:'v-btn',onClick:e=>{e.stopPropagation();remove()}},'Удалить')
+      )
+    ),
+    isOpen&&h('div',{className:'preview-body'+(expanded[id]===true?' expanded':'')},
+      h(AttachmentPreviewContent,{file:att,content:cached?.content,loading:cached?.loading,error:cached?.error,extIcon:attachmentIcon(att),onOpen:()=>onOpen(att)})
+    )
+  );
+}
+
+function TaskDetailPanel({task,listOptions,getTaskList,onUpdate,onToggle,onAddSub,onToggleSub,onEditSub,subInp,setSubInp,onAttach,onDropFile,onDeleteAttachment,previewCache,setPreviewCache,expanded,setExpanded,onOpenAttachment,onShowAttachmentInFinder,onStartAttachmentDrag}){
+  const[subEdit,setSubEdit]=useState(null);
+  const noteRef=useRef(null);
+  const noteText=task?taskNote(task):'';
+  useEffect(()=>{
+    if(!task||!subEdit)return;
+    const stillSelected=String(subEdit.taskId)===String(task.id);
+    const stillExists=(task.subs||[]).some(s=>String(s.id)===String(subEdit.subId));
+    if(!stillSelected||!stillExists)setSubEdit(null);
+  },[task?.id,task?.subs,subEdit]);
+  const startSubEdit=s=>setSubEdit({taskId:task.id,subId:s.id,text:s.text||'',error:''});
+  const cancelSubEdit=()=>setSubEdit(null);
+  const updateNote=e=>{
+    const raw=e.target.value;
+    const applied=applyInlineNoteFormula(raw,e.target.selectionStart);
+    if(applied){
+      onUpdate(task.id,{note:applied.value});
+      requestAnimationFrame(()=>noteRef.current?.setSelectionRange(applied.caret,applied.caret));
+      return;
+    }
+    onUpdate(task.id,{note:raw});
+  };
+  const saveSubEdit=()=>{
+    if(!task||!subEdit)return;
+    const text=(subEdit.text||'').trim();
+    if(!text){setSubEdit(e=>e?{...e,error:'Введите название подзадачи.'}:e);return;}
+    const ok=onEditSub?.(task.id,subEdit.subId,text);
+    if(ok===false){setSubEdit(e=>e?{...e,error:'Не удалось обновить подзадачу.'}:e);return;}
+    setSubEdit(null);
+  };
+  if(!task)return h('div',{className:'bottom-detail task-details-bottom empty-detail'},'Выберите задачу, чтобы увидеть детали и вложения.');
+  const list=getTaskList(task);
+  const done=isTaskDone(task);
+  const subs=task.subs||[];
+  const attachments=task.attachments||[];
+  return h('div',{
+    className:'bottom-detail task-details-bottom',
+    onDragOver:e=>{e.preventDefault();e.stopPropagation();e.currentTarget.classList.add('att-drop-hover')},
+    onDragLeave:e=>{e.currentTarget.classList.remove('att-drop-hover')},
+    onDrop:e=>{e.currentTarget.classList.remove('att-drop-hover');onDropFile(e,task.id);}
+  },
+    h('div',{className:'detail-head'},
+      h('div',null,
+        h('div',{className:'dp-lbl'},'Детали задачи'),
+        h('div',{className:'detail-title'},task.text||task.title||'Без названия')
+      ),
+      h('button',{className:'v-btn '+(done?'':'primary'),onClick:()=>onToggle(task.id)},done?'Вернуть в активные':'Завершить')
+    ),
+    h('div',{className:'detail-grid'},
+      h('div',{className:'detail-field'},h('div',{className:'dp-lbl'},'Дата'),h('input',{type:'date',className:'dp-date',value:taskDate(task),onChange:e=>onUpdate(task.id,{date:e.target.value,dueDate:e.target.value})})),
+      h('div',{className:'detail-field'},h('div',{className:'dp-lbl'},'Время'),h('input',{type:'time',className:'dp-date',value:taskTime(task),onChange:e=>onUpdate(task.id,{dueTime:e.target.value})})),
+      h('div',{className:'detail-field'},h('div',{className:'dp-lbl'},'Список'),h('select',{className:'dp-sel',value:list.id,onChange:e=>onUpdate(task.id,{list:e.target.value})},listOptions.map(v=>h('option',{key:v.id,value:v.id},v.name)))),
+      h('div',{className:'detail-field'},h('div',{className:'dp-lbl'},'Приоритет'),h('select',{className:'dp-sel',value:task.priority,onChange:e=>onUpdate(task.id,{priority:e.target.value})},h('option',{value:'high'},'🔴 Высокий'),h('option',{value:'medium'},'🟡 Средний'),h('option',{value:'low'},'🟢 Низкий')))
+    ),
+    h('div',{className:'meta',style:{marginBottom:8}},
+      h('span',{className:'lchip',style:{background:list.bg,color:list.accent}},list.name),
+      h('span',{className:'due-chip'},done?'Готово':'Активная'),
+      task.completedAt&&h('span',{className:'due-chip'},'завершено '+new Date(task.completedAt).toLocaleString('ru-RU'))
+    ),
+    h('div',{className:'detail-section'},
+      h('div',{className:'detail-section-head'},
+        h('div',{className:'dp-lbl',style:{margin:0}},'Заметка')
+      ),
+      h('textarea',{
+        ref:noteRef,
+        className:'note-textarea',
+        placeholder:'Добавить заметку к задаче...',
+        value:noteText,
+        onChange:updateNote
+      })
+    ),
+    h('div',{className:'detail-section'},
+      h('div',{className:'detail-section-head'},
+        h('div',{className:'dp-lbl',style:{margin:0}},'Подзадачи ('+subs.filter(s=>s.done).length+'/'+subs.length+')')
+      ),
+      subs.map(s=>{
+        const editing=subEdit&&String(subEdit.taskId)===String(task.id)&&String(subEdit.subId)===String(s.id);
+        return h('div',{key:s.id,className:'sub-item'},
+          h('button',{className:'sub-ck'+(s.done?' ck':''),onClick:()=>onToggleSub(task.id,s.id)},s.done?'✓':null),
+          editing
+            ? h('div',{className:'sub-edit-main'},
+                h('div',{className:'sub-edit-row'},
+                  h('input',{className:'sub-inp',autoFocus:true,value:subEdit.text,
+                    onChange:e=>setSubEdit(cur=>cur?{...cur,text:e.target.value,error:''}:cur),
+                    onKeyDown:e=>{
+                      if(e.key==='Enter')saveSubEdit();
+                      if(e.key==='Escape')cancelSubEdit();
+                    }}),
+                  h('button',{className:'sub-edit-btn primary',onClick:saveSubEdit},'Сохранить'),
+                  h('button',{className:'sub-edit-btn',onClick:cancelSubEdit},'Отмена')
+                ),
+                subEdit.error&&h('div',{className:'sub-edit-error'},subEdit.error)
+              )
+            : [
+                h('span',{key:'text',className:'sub-text',onDoubleClick:()=>startSubEdit(s),style:s.done?{textDecoration:'line-through',color:'var(--t3)'}:{color:'var(--t2)'}},s.text),
+                h('button',{key:'edit',className:'sub-edit-btn',onClick:()=>startSubEdit(s)},'Изм.')
+              ]
+        );
+      }),
+      h('div',{className:'add-sub'},
+        h('input',{className:'sub-inp',placeholder:'Добавить подзадачу...',value:subInp[task.id]||'',onChange:e=>setSubInp(s=>({...s,[task.id]:e.target.value})),onKeyDown:e=>e.key==='Enter'&&onAddSub(task.id,subInp[task.id]||'')}),
+        h('button',{className:'sub-add-btn',onClick:()=>onAddSub(task.id,subInp[task.id]||'')},' + ')
+      )
+    ),
+    h('div',{className:'detail-section'},
+      h('div',{className:'detail-section-head'},
+        h('div',{className:'dp-lbl',style:{margin:0}},'Вложения ('+attachments.length+')'),
+        h('button',{className:'v-btn primary',onClick:()=>onAttach(task.id)},'+ Добавить')
+      ),
+      h('div',{className:'att-drop detail-drop',onClick:()=>onAttach(task.id)},
+        h('div',{className:'att-drop-ic'},'📎'),
+        h('div',{className:'att-drop-txt'},'Перетащи файл сюда или нажми'),
+        h('div',{className:'att-drop-sub'},'PDF, DOCX, DOC, XLSX, TXT, изображения')
+      ),
+      attachments.length>0
+        ? h('div',{className:'detail-preview-list'},
+            attachments.map((att,i)=>h(AttachmentPreviewCard,{
+              key:att.id,taskId:task.id,att,index:i,expanded,setExpanded,previewCache,setPreviewCache,
+              onOpen:onOpenAttachment,onShowInFinder:onShowAttachmentInFinder,onStartDrag:onStartAttachmentDrag,onDelete:onDeleteAttachment
+            }))
+          )
+        : h('div',{className:'empty',style:{padding:'24px 0'}},'Вложений нет')
+    )
+  );
+}
+
+/* ── APP ── */
+function App(){
+  const[tasks,setTasksR]=useState([]);
+  const[lists,setListsR]=useState(DEFAULT_LISTS);
+  const[loaded,setLoaded]=useState(false);
+  const[saved,setSaved]=useState(true);
+  const[view,setView]=useState('list');
+  const[lf,setLf]=useState('today');
+  const[ltab,setLtab]=useState('all');
+  const[selectedTaskId,setSelectedTaskId]=useState(null);
+  const[viewer,setViewer]=useState(null);
+  const[listMgr,setListMgr]=useState(false);
+  const[previewCache,setPreviewCache]=useState({});
+  const[expandedPreviews,setExpandedPreviews]=useState({});
+  const[calM,setCalM]=useState(()=>{const d=new Date();return{y:d.getFullYear(),m:d.getMonth()}});
+  const[calSel,setCalSel]=useState(null);
+  const[wOff,setWOff]=useState(0);
+  const[nTxt,setNTxt]=useState('');
+  const[nPrio,setNPrio]=useState('medium');
+  const[nDate,setNDate]=useState(toDS(tod()));
+  const[nTime,setNTime]=useState('');
+  const[nList,setNList]=useState('work');
+  const[expSubs,setExpSubs]=useState({});
+  const[subInp,setSubInp]=useState({});
+  const[dayAdd,setDayAdd]=useState({});
+  const[calendarDraft,setCalendarDraft]=useState(null);
+  const[dragId,setDragId]=useState(null);
+  const[dragOv,setDragOv]=useState(null);
+  const[dropDay,setDropDay]=useState(null);
+  const inpRef=useRef(null);
+  const detailRef=useRef(null);
+  const saveTimer=useRef(null);
+  const dueNotified=useRef(new Set());
+  const tasksRef=useRef([]);
+  const listsRef=useRef(DEFAULT_LISTS);
+
+  useEffect(()=>{loadStorage().then(({tasks,lists})=>{setTasksR(tasks);setListsR(lists);tasksRef.current=tasks;listsRef.current=lists;setNList(lists[0]?.id||SYSTEM_LIST.id);setLoaded(true)});}, []);
+  useEffect(()=>{tasksRef.current=tasks;},[tasks]);
+  useEffect(()=>{listsRef.current=lists;},[lists]);
+
+  const allLists=useMemo(()=>[...lists,SYSTEM_LIST],[lists]);
+  const listMap=useMemo(()=>Object.fromEntries(allLists.map(l=>[l.id,l])),[allLists]);
+  const getList=id=>listMap[resolveListId(id,lists)]||SYSTEM_LIST;
+  const getTaskList=t=>getList(t?.listId||t?.list);
+  const listOptions=allLists;
+  const selectedTask=useMemo(()=>tasks.find(t=>String(t.id)===String(selectedTaskId))||null,[tasks,selectedTaskId]);
+  useEffect(()=>{if(selectedTaskId&&!selectedTask)setSelectedTaskId(null);},[selectedTaskId,selectedTask]);
+  const selectTask=useCallback((id,{scroll=false}={})=>{
+    let shouldScroll=false;
+    setSelectedTaskId(current=>{
+      const isSame=String(current)===String(id);
+      shouldScroll=scroll&&!isSame;
+      return isSame?null:id;
+    });
+    if(scroll)requestAnimationFrame(()=>{if(shouldScroll)detailRef.current?.scrollIntoView({behavior:'smooth',block:'start'});});
+  },[]);
+
+  useEffect(()=>{
+    if(!loaded||!window.muninAPI)return;
+    const checkDue=()=>{
+      const now=Date.now();
+      tasks.forEach(t=>{
+        const d=taskDate(t), tm=taskTime(t);
+        if(!d||!tm||isTaskDone(t))return;
+        const key=`${t.id}:${d}:${tm}`;
+        if(dueNotified.current.has(key))return;
+        const dueAt=localDateTimeMs(d,tm);
+        if(Number.isFinite(dueAt)&&now>=dueAt&&now-dueAt<60000){
+          dueNotified.current.add(key);
+          window.muninAPI.notify({title:'Munin',body:`${t.text} · ${fmtDue(t)}`});
+        }
+      });
+    };
+    checkDue();
+    const timer=setInterval(checkDue,30000);
+    return()=>clearInterval(timer);
+  },[loaded,tasks]);
+
+  const persistLater=useCallback((nextTasks,nextLists)=>{
+    setSaved(false);
+    clearTimeout(saveTimer.current);
+    saveTimer.current=setTimeout(()=>{saveStorage(nextTasks,nextLists).then(()=>setSaved(true));},700);
+  },[]);
+
+  const setTasks=useCallback((upd)=>{
+    setTasksR(prev=>{
+      const next=typeof upd==='function'?upd(prev):upd;
+      tasksRef.current=next;
+      persistLater(next,listsRef.current);
+      return next;
+    });
+  },[persistLater]);
+
+  const setLists=useCallback((upd)=>{
+    setListsR(prev=>{
+      const next=typeof upd==='function'?upd(prev):upd;
+      listsRef.current=next;
+      persistLater(tasksRef.current,next);
+      return next;
+    });
+  },[persistLater]);
+
+  const updTask=(id,p)=>setTasks(t=>t.map(x=>String(x.id)===String(id)?{...x,...p}:x));
+  const toggleTask=(id)=>{
+    setTasks(prev=>prev.map(task=>{
+      if(String(task.id)!==String(id))return task;
+      const done=!isTaskDone(task);
+      return {...task,done,completed:done,checked:done,completedAt:done?nowIso():null};
+    }));
+  };
+  const delTask=(id)=>{setTasks(t=>t.filter(x=>String(x.id)!==String(id)));if(String(selectedTaskId)===String(id))setSelectedTaskId(null)};
+  const togSub=(tid,sid)=>setTasks(t=>t.map(x=>String(x.id)===String(tid)?{...x,subs:(x.subs||[]).map(s=>String(s.id)===String(sid)?{...s,done:!s.done}:s)}:x));
+  const editSub=(tid,sid,txt)=>{
+    const text=(txt||'').trim();
+    if(!text)return false;
+    const parent=tasksRef.current.find(t=>String(t.id)===String(tid));
+    if(!parent||!(parent.subs||[]).some(s=>String(s.id)===String(sid)))return false;
+    setTasks(t=>t.map(x=>String(x.id)===String(tid)?{...x,subs:(x.subs||[]).map(s=>String(s.id)===String(sid)?{...s,text}:s)}:x));
+    return true;
+  };
+  const addSub=(tid,txt)=>{if(!txt.trim())return;const ns={id:uid(),text:txt.trim(),done:false};setTasks(t=>t.map(x=>String(x.id)===String(tid)?{...x,subs:[...(x.subs||[]),ns]}:x));setSubInp(s=>({...s,[tid]:''}));};
+
+  const addTask=(txt,prio,date,list,time,opts={})=>{
+    const text=(txt||nTxt).trim();if(!text)return null;
+    const dueTime=time!==undefined?time:nTime;
+    const dueDate=date||nDate||toDS(tod());
+    const t={id:uid(),text,done:false,priority:prio||nPrio,date:dueDate,dueDate,dueTime:dueTime||'',list:list||nList,note:'',subs:[],attachments:[]};
+    setTasks(ts=>[t,...ts]);if(opts.clearDraft!==false)setNTxt('');if(opts.focus!==false)inpRef.current?.focus();
+    if(window.muninAPI) window.muninAPI.notify({title:'Munin',body:'Добавлено: '+text+(fmtDue(t)?' · '+fmtDue(t):'')});
+    return t;
+  };
+
+  const openCalendarCreate=(dateString)=>{
+    const dateObj=parseLocalDate(dateString);
+    if(!dateObj)return;
+    const dueDate=formatLocalDate(dateObj);
+    setCalendarDraft({
+      sourceView:'calendar',
+      selectedDate:dueDate,
+      title:'',
+      dueDate,
+      dueTime:'',
+      priority:nPrio,
+      listId:nList,
+      error:''
+    });
+  };
+  const cancelCalendarCreate=()=>{
+    setCalendarDraft(null);
+  };
+  const saveCalendarTask=()=>{
+    const draft=calendarDraft;
+    if(!draft)return;
+    const title=(draft.title||'').trim();
+    const rawDate=(draft.dueDate||'').trim();
+    const dateObj=parseLocalDate(rawDate);
+    if(!title){setCalendarDraft(d=>d?{...d,error:'Введите название задачи.'}:d);return;}
+    if(!rawDate||!dateObj||formatLocalDate(dateObj)!==rawDate){setCalendarDraft(d=>d?{...d,error:'Введите корректную дату.'}:d);return;}
+    const targetDate=formatLocalDate(dateObj);
+    const created=addTask(title,draft.priority,targetDate,draft.listId,draft.dueTime,{focus:false,clearDraft:false});
+    if(!created){setCalendarDraft(d=>d?{...d,error:'Не удалось создать задачу.'}:d);return;}
+    setCalendarDraft(null);
+    if(targetDate!==calSel){
+      setCalSel(targetDate);
+      const d=parseLocalDate(targetDate);
+      if(d)setCalM({y:d.getFullYear(),m:d.getMonth()});
+    }
+  };
+
+  const handleAttach=async(taskId)=>{
+    if(!window.muninAPI){alert('Вложения доступны в Electron-приложении');return;}
+    const r=await window.muninAPI.attachFile(taskId);
+    if(!r.ok){if(r.error)alert(r.error);return;}
+    updTask(taskId,{attachments:[...(tasks.find(t=>t.id===taskId)?.attachments||[]),...r.files]});
+  };
+
+  // Drag-and-drop файлов на зону вложения
+  const handleFileDrop=useCallback((e,taskId)=>{
+    e.preventDefault();e.stopPropagation();
+    const files=Array.from(e.dataTransfer.files);
+    if(!files.length)return;
+    if(window.muninAPI){
+      const paths=files.map(f=>window.muninAPI.getDroppedFilePath?.(f)).filter(Boolean);
+      if(paths.length!==files.length){
+        alert('Не удалось получить путь к перетащенному файлу. Используйте кнопку добавления вложения.');
+        return;
+      }
+      window.muninAPI.attachDroppedFiles(paths).then(r=>{
+        if(!r.ok){alert(r.error||'Не удалось сохранить вложение.');return;}
+        const cur=tasks.find(t=>t.id===taskId)?.attachments||[];
+        updTask(taskId,{attachments:[...cur,...r.files]});
+      });
+      return;
+    }
+    const process=files.map(file=>new Promise(resolve=>{
+      const ext=file.name.split('.').pop().toLowerCase();
+      const id=Date.now()+'_'+Math.random().toString(36).slice(2);
+      resolve({id,name:file.name,originalName:file.name,ext,size:file.size,path:'',preview:null,previewMime:null});
+    }));
+    Promise.all(process).then(newAtts=>{
+      const cur=tasks.find(t=>t.id===taskId)?.attachments||[];
+      updTask(taskId,{attachments:[...cur,...newAtts]});
+    });
+  },[tasks,updTask]);
+
+  const delAttachment=async(taskId,att)=>{
+    if(window.muninAPI){
+      const r=await window.muninAPI.deleteAttachment(att);
+      if(!r.ok){alert(r.error||'Не удалось удалить вложение.');return;}
+    }
+    const task=tasks.find(t=>t.id===taskId);
+    if(!task)return;
+    updTask(taskId,{attachments:task.attachments.filter(a=>a.id!==att.id)});
+    setPreviewCache(c=>{const n={...c};delete n[att.id];return n});
+    setExpandedPreviews(e=>{const n={...e};delete n[att.id];return n});
+  };
+
+  const openAttachment=async(att)=>{
+    if(!window.muninAPI){alert('Открытие в системе доступно только в Electron-приложении.');return;}
+    const r=await window.muninAPI.openAttachment(att);
+    if(!r.ok)alert(r.error||'Не удалось открыть файл системным приложением.');
+  };
+
+  const showAttachmentInFinder=async(att)=>{
+    if(!window.muninAPI?.showAttachmentInFinder){alert('Показ в Finder доступен только в Electron-приложении.');return;}
+    const r=await window.muninAPI.showAttachmentInFinder(att);
+    if(!r.ok)alert(r.error||'Не удалось показать файл в Finder.');
+  };
+
+  const startAttachmentDrag=(att,e)=>{
+    e?.stopPropagation();
+    e?.preventDefault();
+    if(!window.muninAPI?.startDragAttachment){alert('Перетаскивание файла наружу доступно только в Electron-приложении.');return;}
+    try {
+      const r=window.muninAPI.startDragAttachment(att);
+      if(!r?.ok)alert(r?.error||'Не удалось начать перетаскивание файла.');
+    } catch (err) {
+      alert(err?.message||'Не удалось начать перетаскивание файла.');
+    }
+  };
+
+  const listNameExists=(name,exceptId=null)=>lists.some(l=>l.id!==exceptId&&l.name.trim().toLowerCase()===name.trim().toLowerCase());
+  const addList=(name)=>{
+    const clean=name.trim();
+    if(!clean)return 'Название списка не может быть пустым.';
+    if(listNameExists(clean))return 'Список с таким названием уже есть.';
+    const color=LIST_COLORS[lists.length%LIST_COLORS.length];
+    const list={id:uniqueListId(clean,lists),name:clean,accent:color[0],bg:color[1],createdAt:nowIso(),updatedAt:nowIso()};
+    setLists(ls=>[...ls,list]);
+    setNList(list.id);
+    return '';
+  };
+  const renameList=(id,name)=>{
+    const clean=name.trim();
+    if(!clean)return 'Название списка не может быть пустым.';
+    if(listNameExists(clean,id))return 'Список с таким названием уже есть.';
+    setLists(ls=>ls.map(l=>l.id===id?{...l,name:clean,updatedAt:nowIso()}:l));
+    return '';
+  };
+  const deleteList=(id)=>{
+    const count=tasks.filter(t=>resolveListId(t.listId||t.list,lists)===id).length;
+    if(count>0)return 'В этом списке есть задачи. Сначала перенесите их или выберите другой список для переноса.';
+    setLists(ls=>ls.filter(l=>l.id!==id));
+    if(lf===id)setLf('all');
+    if(nList===id)setNList(SYSTEM_LIST.id);
+    return '';
+  };
+
+  const onDragStart=(e,id)=>{
+    setDragId(id);
+    if(e?.dataTransfer){
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain',String(id));
+    }
+  };
+  const onDragOver=(e,id)=>{e.preventDefault();setDragOv(id)};
+  const onDrop=(e,tid)=>{e.preventDefault();if(dragId===tid){setDragId(null);setDragOv(null);return;}setTasks(ts=>{const f=ts.findIndex(t=>t.id===dragId),to=ts.findIndex(t=>t.id===tid);if(f<0||to<0)return ts;const a=[...ts];const[item]=a.splice(f,1);a.splice(to,0,item);return a;});setDragId(null);setDragOv(null);};
+  const onDayDragOver=(e,ds)=>{if(!dragId)return;e.preventDefault();e.dataTransfer.dropEffect='move';setDropDay(ds)};
+  const onDayDrop=(e,ds)=>{
+    e.preventDefault();e.stopPropagation();
+    const id=e.dataTransfer?.getData('text/plain')||dragId;
+    if(!id){setDropDay(null);return;}
+    setTasks(ts=>ts.map(t=>String(t.id)===String(id)?{...t,date:ds,dueDate:ds}:t));
+    setDropDay(null);setDragId(null);setDragOv(null);
+  };
+  const onDayDragLeave=(e,ds)=>{if(e.currentTarget.contains(e.relatedTarget))return;setDropDay(d=>d===ds?null:d)};
+
+  const todStr=toDS(tod());
+  const getF=()=>{
+    let l=tasks;
+    if(listMap[lf])l=l.filter(t=>resolveListId(t.listId||t.list,lists)===lf);
+    else if(lf==='today')l=l.filter(t=>isTodayDateString(taskDate(t))&&!isTaskDone(t));
+    else if(lf==='upcoming')l=l.filter(t=>isFutureDateString(taskDate(t))&&!isTaskDone(t));
+    else if(lf==='all')l=l.filter(t=>!isTaskDone(t));
+    else if(lf==='done')l=l.filter(t=>isTaskDone(t));
+    if(ltab==='open')l=l.filter(t=>!isTaskDone(t));
+    if(ltab==='done')l=l.filter(t=>isTaskDone(t));
+    return sortTasks(l);
+  };
+
+  const sidebarCounts=useMemo(()=>getSidebarCounts(tasks),[tasks,todStr]);
+  const todayProgress=useMemo(()=>getTodayProgress(tasks),[tasks,todStr]);
+  const pct=todayProgress.pct;
+
+  useEffect(()=>{
+    if(!selectedTaskId||view!=='list')return;
+    if(!getF().some(t=>String(t.id)===String(selectedTaskId)))setSelectedTaskId(null);
+  },[selectedTaskId,view,lf,ltab,tasks,lists]);
+
+  const weekDays=useMemo(()=>{
+    const s=addD(tod(),wOff*7);const dow=(s.getDay()+6)%7;const mon=addD(s,-dow);
+    return Array.from({length:7},(_,i)=>{
+      const dateObj=addD(mon,i);
+      const dateString=formatLocalDate(dateObj);
+      return {
+        dateObj,
+        dateString,
+        dayNumber:dateObj.getDate(),
+        monthName:dateObj.toLocaleDateString('ru-RU',{month:'long'}),
+        weekdayName:dateObj.toLocaleDateString('ru-RU',{weekday:'long'}),
+        isToday:sameD(dateObj,tod())
+      };
+    });
+  },[wOff]);
+
+  const calCells=useMemo(()=>{
+    const{y,m}=calM;const first=new Date(y,m,1);const dow=(first.getDay()+6)%7;
+    const cells=[];
+    for(let i=0;i<dow;i++)cells.push({date:addD(first,-dow+i),other:true});
+    const days=new Date(y,m+1,0).getDate();
+    for(let i=1;i<=days;i++)cells.push({date:new Date(y,m,i),other:false});
+    while(cells.length<42)cells.push({date:addD(new Date(y,m+1,1),cells.length-dow-days),other:true});
+    return cells;
+  },[calM]);
+
+  const tasksByDate=useMemo(()=>{const map={};sortTasks(tasks).forEach(t=>{const d=taskDate(t);if(d){if(!map[d])map[d]=[];map[d].push(t);}});return map;},[tasks]);
+
+  const vTitle=listMap[lf]?.name||{today:'Сегодня',upcoming:'Предстоящее',all:'Все задачи',done:'Завершённые'}[lf];
+  const nowStr=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+
+  if(!loaded)return h('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'var(--t3)',fontFamily:'JetBrains Mono,monospace',fontSize:13}},'Загрузка...');
+
+  const filtered=getF();
+  const openT=filtered.filter(t=>!isTaskDone(t));
+  const doneT=filtered.filter(t=>isTaskDone(t));
+
+  return h('div',{className:'app'},
+    viewer&&h(FileViewer,{file:viewer,onClose:()=>setViewer(null)}),
+    listMgr&&h(ListManager,{lists,tasks,onAdd:addList,onRename:renameList,onDelete:deleteList,onClose:()=>setListMgr(false)}),
+    h('div',{className:'titlebar'},h('span',null,'Munin')),
+    h('div',{className:'body'},
+
+      // SIDEBAR
+      h('aside',{className:'sb'},
+        h('div',{className:'sb-logo'},h('div',{className:'logo-t'},'Munin'),h('div',{className:'logo-s'},'// v2.0')),
+        h('div',{className:'sb-scroll'},
+          h('div',{className:'sec-lbl'},'Обзор'),
+          ...[{id:'today',ic:'☀',lb:'Сегодня',bdg:sidebarCounts.today},{id:'upcoming',ic:'◫',lb:'Предстоящее',bdg:sidebarCounts.upcoming},{id:'all',ic:'≡',lb:'Все задачи',bdg:sidebarCounts.all},{id:'done',ic:'✓',lb:'Завершённые',bdg:sidebarCounts.done}].map(n=>
+            h('button',{key:n.id,className:'nav'+(lf===n.id&&!listMap[n.id]?' on':''),onClick:()=>{setLf(n.id);setSelectedTaskId(null);setView('list')}},
+              h('span',{style:{fontSize:14,width:18,textAlign:'center'}},n.ic),n.lb,
+              n.bdg?h('span',{className:'bdg'},n.bdg):null
+            )
+          ),
+          h('div',{className:'sec-head',style:{marginTop:8}},
+            h('div',{className:'sec-lbl'},'Списки'),
+            h('button',{className:'mini-btn',title:'Управление списками',onClick:()=>setListMgr(true)},'⚙')
+          ),
+          ...allLists.map(v=>
+            h('button',{key:v.id,className:'lst-btn'+(lf===v.id?' on':''),onClick:()=>{setLf(v.id);setSelectedTaskId(null);setView('list')}},
+              h('span',{className:'dot',style:{background:v.accent}}),v.name,
+              h('span',{className:'lst-cnt'},tasks.filter(t=>resolveListId(t.listId||t.list,lists)===v.id&&!isTaskDone(t)).length)
+            )
+          )
+        ),
+        h('div',{className:'sb-foot'},
+          h('div',{className:'prog-row'},h('span',null,'Сегодня'),h('span',{className:'prog-am'},pct+'%')),
+          h('div',{className:'prog-track'},h('div',{className:'prog-fill',style:{width:pct+'%'}})),
+          h('div',{className:'save-ind'},saved?h('span',{className:'save-ok'},'● сохранено'):h('span',null,'● сохранение...'))
+        )
+      ),
+
+      // MAIN
+      h('main',{className:'main'},
+        h('div',{className:'topbar'},
+          h('div',{className:'tb-top'},
+            h('div',null,
+              h('div',{className:'tb-title'},view==='week'?'7 дней':view==='calendar'?'Календарь':vTitle),
+              h('div',{className:'tb-date'},nowStr)
+            ),
+            h('div',{className:'tb-actions'},
+              h('button',{className:'ic-btn',onClick:()=>setTasks(t=>t.filter(x=>!isTaskDone(x)))},'🗑 Очистить завершённые')
+            )
+          ),
+          h('div',{className:'view-tabs'},
+            ...[['list','Список'],['week','7 дней'],['calendar','Календарь']].map(([v,l])=>
+              h('button',{key:v,className:'vtab'+(view===v?' on':''),onClick:()=>setView(v)},l)
+            ),
+            view==='list'&&h('div',{key:'lt',style:{marginLeft:'auto',display:'flex'}},
+              ...[['all','Все'],['open','Активные'],['done','Готово']].map(([v,l])=>
+                h('button',{key:v,className:'vtab'+(ltab===v?' on':''),onClick:()=>setLtab(v)},l)
+              )
+            )
+          )
+        ),
+
+        // LIST VIEW
+        view==='list'&&h('div',{key:'lv'},
+          h('div',{className:'list-view'},
+            !filtered.length&&h('div',{className:'empty'},h('div',{className:'empty-ic'},'✦'),h('div',null,'Задач нет')),
+            openT.length>0&&[
+              doneT.length>0?h('div',{key:'lo',className:'sec-t'},'Активные · '+openT.length):null,
+              ...openT.map(t=>h(TC,{key:t.id,t,isDrag:dragId===t.id,isDragOv:dragOv===t.id,
+                onDragStart:e=>onDragStart(e,t.id),onDragOver:e=>onDragOver(e,t.id),onDrop:e=>onDrop(e,t.id),
+                onToggle:()=>toggleTask(t.id),onDel:()=>delTask(t.id),
+                onSel:()=>selectTask(t.id),isSel:String(selectedTaskId)===String(t.id),
+                expSubs,setExpSubs,subInp,setSubInp,onTogSub:togSub,onAddSub:addSub,todStr,listInfo:getTaskList(t)}))
+            ],
+            doneT.length>0&&[
+              openT.length>0?h('div',{key:'ld',className:'sec-t',style:{marginTop:8}},'Готово · '+doneT.length):null,
+              ...doneT.map(t=>h(TC,{key:t.id,t,isDrag:dragId===t.id,isDragOv:dragOv===t.id,
+                onDragStart:e=>onDragStart(e,t.id),onDragOver:e=>onDragOver(e,t.id),onDrop:e=>onDrop(e,t.id),
+                onToggle:()=>toggleTask(t.id),onDel:()=>delTask(t.id),
+                onSel:()=>selectTask(t.id),isSel:String(selectedTaskId)===String(t.id),
+                expSubs,setExpSubs,subInp,setSubInp,onTogSub:togSub,onAddSub:addSub,todStr,listInfo:getTaskList(t)}))
+            ]
+          ),
+          h('div',{className:'add-area'},
+            h('div',{className:'af'},
+              h('span',{style:{color:'var(--am)',fontSize:15,flexShrink:0}},'+'),
+              h('input',{ref:inpRef,className:'ai',placeholder:'Добавить задачу...',value:nTxt,
+                onChange:e=>setNTxt(e.target.value),onKeyDown:e=>e.key==='Enter'&&addTask()}),
+              h('button',{className:'clip-btn',title:'Прикрепить файл',onClick:()=>{const t=addTask();}},'📎')
+            ),
+            h('div',{className:'as-row'},
+              h('select',{className:'ms',value:nPrio,onChange:e=>setNPrio(e.target.value)},
+                h('option',{value:'high'},'🔴 Высокий'),h('option',{value:'medium'},'🟡 Средний'),h('option',{value:'low'},'🟢 Низкий')),
+              h('input',{type:'date',className:'ms',value:nDate,style:{colorScheme:'dark'},onChange:e=>setNDate(e.target.value)}),
+              h('input',{type:'time',className:'ms',value:nTime,style:{colorScheme:'dark'},onChange:e=>setNTime(e.target.value),title:'Время задачи'}),
+              h('select',{className:'ms',value:nList,onChange:e=>setNList(e.target.value)},
+                listOptions.map(v=>h('option',{key:v.id,value:v.id},v.name))),
+              h('button',{className:'add-b',onClick:()=>addTask()},'Добавить →')
+            )
+          )
+        ),
+
+        // 7-DAY VIEW
+        view==='week'&&h('div',{key:'wv',className:'week-view'},
+          h('div',{className:'week-nav-bar'},
+            h('button',{className:'wn-btn',onClick:()=>setWOff(w=>w-1)},'‹'),
+            h('span',{className:'wn-lbl'},wOff===0?'Эта неделя':wOff===1?'След. неделя':wOff===-1?'Пред. неделя':`Неделя ${wOff>0?'+':''}${wOff}`),
+            h('button',{className:'wn-btn',onClick:()=>setWOff(w=>w+1)},'›'),
+            wOff!==0&&h('button',{className:'wn-today',onClick:()=>setWOff(0)},'Сегодня')
+          ),
+          h('div',{className:'week-scroll'},
+            h('div',{className:'week-cols'},
+              weekDays.map(dayInfo=>{
+                const ds=dayInfo.dateString;const dt=(tasksByDate[ds]||[]);const isT=dayInfo.isToday;const addA=dayAdd[ds];
+                return h('div',{key:ds,
+                  className:'day-col'+(isT?' today-col':'')+(dropDay===ds?' drop-day':''),
+                  onDragOver:e=>onDayDragOver(e,ds),
+                  onDragLeave:e=>onDayDragLeave(e,ds),
+                  onDrop:e=>onDayDrop(e,ds)},
+                  h('div',{className:'day-head'},
+                    h('div',{className:'day-name'+(isT?' today-nm':'')},isT?'Сегодня':fmtD(ds)),
+                    h('div',{className:'day-wd'},dayInfo.weekdayName)
+                  ),
+                  h('div',{className:'day-tasks'},
+                    dt.map(t=>h('div',{key:t.id,
+                      className:'day-task ph-'+t.priority+(isTaskDone(t)?' done-dt':'')+(String(selectedTaskId)===String(t.id)?' sel':''),
+                      role:'button',
+                      tabIndex:0,
+                      'aria-label':'Открыть детали задачи '+t.text,
+                      draggable:true,
+                      onDragStart:e=>onDragStart(e,t.id),
+                      onDragEnd:()=>{setDragId(null);setDropDay(null)},
+                      onKeyDown:e=>{
+                        if(e.key==='Enter'||e.key===' '){e.preventDefault();selectTask(t.id,{scroll:true});}
+                      },
+                      onClick:()=>selectTask(t.id,{scroll:true})},
+                      h('button',{className:'d-ph'+(isTaskDone(t)?' ck':''),onClick:e=>{e.stopPropagation();toggleTask(t.id)}},isTaskDone(t)?'✓':null),
+                      h('span',{className:'d-tt'+(isTaskDone(t)?' dk':'')},taskTime(t)?taskTime(t)+' · '+t.text:t.text)
+                    ))
+                  ),
+                  addA
+                    ? h('div',{className:'day-add'},
+                        h('span',{style:{color:'var(--am)'}},'+'),
+                        h('input',{className:'day-add-inp',autoFocus:true,placeholder:'Задача...',
+                          value:dayAdd[ds]?.txt||'',
+                          onChange:e=>setDayAdd(s=>({...s,[ds]:{txt:e.target.value}})),
+                          onKeyDown:e=>{
+                            if(e.key==='Enter'&&dayAdd[ds]?.txt?.trim()){addTask(dayAdd[ds].txt,nPrio,ds,nList);setDayAdd(s=>{const n={...s};delete n[ds];return n});}
+                            if(e.key==='Escape')setDayAdd(s=>{const n={...s};delete n[ds];return n});
+                          },
+                          onBlur:()=>setTimeout(()=>setDayAdd(s=>{const n={...s};delete n[ds];return n}),150)
+                        })
+                      )
+                    : h('div',{className:'day-add',onClick:()=>setDayAdd(s=>({...s,[ds]:{txt:''}}))},
+                        h('span',{style:{marginRight:4}},'+'),'Добавить задачу')
+                )
+              })
+            )
+          )
+        ),
+
+        // CALENDAR VIEW
+        view==='calendar'&&h('div',{key:'cv',className:'cal-view'},
+          h('div',{className:'cal-header'},
+            h('button',{className:'cal-nav',onClick:()=>setCalM(({y,m})=>m===0?{y:y-1,m:11}:{y,m:m-1})},'‹'),
+            h('button',{className:'cal-nav',onClick:()=>setCalM(({y,m})=>m===11?{y:y+1,m:0}:{y,m:m+1})},'›'),
+            h('span',{className:'cal-m-lbl'},RU_MONTHS[calM.m]+' '+calM.y),
+            h('button',{className:'cal-today-b',onClick:()=>{const d=new Date();setCalM({y:d.getFullYear(),m:d.getMonth()});setCalSel(toDS(tod()));setCalendarDraft(null);}},'Сегодня'),
+            calSel&&h('span',{style:{marginLeft:'auto',fontSize:12,color:'var(--am)',fontFamily:'JetBrains Mono,monospace'}},
+              fmtD(calSel)+' · '+(tasksByDate[calSel]||[]).length+' задач')
+          ),
+          h('div',{className:'cal-body'},
+            // LEFT: месячная сетка
+            h('div',{className:'cal-grid-col'},
+              h('div',{className:'cal-wds'},RU_WD.map(d=>h('div',{key:d,className:'cal-wd'},d))),
+              h('div',{className:'cal-grid'},
+                calCells.map(({date,other},i)=>{
+                  const ds=toDS(date);const isT=sameD(date,tod());const isS=calSel&&ds===calSel;
+                  const ct=(tasksByDate[ds]||[]);const shown=ct.slice(0,2);const more=ct.length-shown.length;
+                  return h('div',{key:i,
+                    className:'cal-cell'+(other?' other':'')+(isT?' today-c':'')+(isS?' sel-c':'')+(dropDay===ds?' drop-day':''),
+                    onDragOver:e=>onDayDragOver(e,ds),
+                    onDragLeave:e=>onDayDragLeave(e,ds),
+                    onDrop:e=>onDayDrop(e,ds),
+                    onClick:()=>{setCalSel(ds);setSelectedTaskId(null);setCalendarDraft(null);}},
+                    h('div',{className:'cal-dn'},date.getDate()),
+                    ...shown.map(t=>h('div',{key:t.id,className:'cal-pill'+(String(selectedTaskId)===String(t.id)?' sel':''),
+                      draggable:true,
+                      onDragStart:e=>{e.stopPropagation();onDragStart(e,t.id)},
+                      onDragEnd:e=>{e.stopPropagation();setDragId(null);setDropDay(null)},
+                      onClick:e=>{e.stopPropagation();selectTask(t.id);},
+                      style:{background:getTaskList(t).bg||'var(--s3)',color:getTaskList(t).accent||'var(--t2)',opacity:isTaskDone(t)?0.5:1},
+                      title:t.text},taskTime(t)?taskTime(t)+' · '+t.text:t.text)),
+                    more>0&&h('div',{className:'cal-more'},'+'+more)
+                  )
+                })
+              )
+            ),
+            // LOWER: панель выбранного дня
+            h('div',{className:'cal-day-panel'},
+              calSel
+                ? h('div',{style:{display:'flex',flexDirection:'column',height:'100%'}},
+                    // Заголовок дня
+                    h('div',{className:'cdp-head'},
+                      h('div',{className:'cdp-title'},
+                        sameD(calSel,toDS(tod()))?'Сегодня':fmtD(calSel)
+                      ),
+                      h('div',{className:'cdp-sub'},
+                        fmtWeekday(calSel))
+                    ),
+                    // Список задач дня
+                    h('div',{className:'cdp-tasks'},
+                      (tasksByDate[calSel]||[]).length===0
+                        ? h('div',{className:'cdp-empty'},'✦',h('div',null,'Задач нет'))
+                        : (tasksByDate[calSel]||[]).map(t=>
+                            h('div',{key:t.id,
+                              className:'cdp-task'+(isTaskDone(t)?' cdp-done':'')+(String(selectedTaskId)===String(t.id)?' sel':''),
+                              draggable:true,
+                              onDragStart:e=>onDragStart(e,t.id),
+                              onDragEnd:()=>{setDragId(null);setDropDay(null)},
+                              onClick:()=>selectTask(t.id)},
+                              h('button',{
+                                className:'ph'+(isTaskDone(t)?' ck':''),
+                                style:{width:16,height:16,fontSize:9,flexShrink:0,marginTop:1},
+                                onClick:e=>{e.stopPropagation();toggleTask(t.id)}},
+                                isTaskDone(t)?'✓':null),
+                              h('div',{style:{flex:1,minWidth:0}},
+                                h('div',{className:'cdp-task-t'+(isTaskDone(t)?' dk':'')},t.text),
+                                h('div',{style:{display:'flex',gap:5,marginTop:3,flexWrap:'wrap'}},
+                                  taskTime(t)&&h('span',{className:'due-chip'},taskTime(t)),
+                                  h('span',{className:'lchip',style:{fontSize:10,background:getTaskList(t).bg,color:getTaskList(t).accent}},getTaskList(t).name),
+                                  h('span',{className:'pdot',style:{background:PRIO_C[t.priority]}})
+                                )
+                              ),
+                              t.attachments?.length>0&&h('span',{style:{fontSize:10,color:'var(--blue)'}},
+                                '📎'+t.attachments.length)
+                            )
+                          )
+                    ),
+                    // Поле добавления задачи в этот день
+                    h('div',{className:'cdp-add'},
+                      calendarDraft?.sourceView==='calendar'&&calendarDraft.selectedDate===calSel
+                        ? [
+                            h('div',{key:'title',className:'cdp-add-row'},
+                              h('span',{style:{color:'var(--am)',fontSize:14,flexShrink:0}},'+'),
+                              h('input',{className:'cdp-inp',autoFocus:true,placeholder:'Название задачи...',
+                                value:calendarDraft.title,
+                                onChange:e=>setCalendarDraft(d=>d?{...d,title:e.target.value,error:''}:d),
+                                onKeyDown:e=>{
+                                  if(e.key==='Enter')saveCalendarTask();
+                                  if(e.key==='Escape')cancelCalendarCreate();
+                                }
+                              })
+                            ),
+                            h('div',{key:'fields',className:'cdp-add-fields'},
+                              h('input',{type:'date',className:'ms',value:calendarDraft.dueDate,style:{colorScheme:'dark'},onChange:e=>setCalendarDraft(d=>d?{...d,dueDate:e.target.value,error:''}:d),title:'Дата задачи'}),
+                              h('input',{type:'time',className:'ms',value:calendarDraft.dueTime,style:{colorScheme:'dark'},onChange:e=>setCalendarDraft(d=>d?{...d,dueTime:e.target.value}:d),title:'Время задачи'}),
+                              h('select',{className:'ms',value:calendarDraft.priority,onChange:e=>setCalendarDraft(d=>d?{...d,priority:e.target.value}:d)},
+                                h('option',{value:'high'},'🔴 Высокий'),h('option',{value:'medium'},'🟡 Средний'),h('option',{value:'low'},'🟢 Низкий')),
+                              h('select',{className:'ms',value:calendarDraft.listId,onChange:e=>setCalendarDraft(d=>d?{...d,listId:e.target.value}:d)},
+                                listOptions.map(v=>h('option',{key:v.id,value:v.id},v.name)))
+                            ),
+                            calendarDraft.error&&h('div',{key:'err',className:'cdp-add-error'},calendarDraft.error),
+                            h('div',{key:'actions',className:'cdp-add-actions'},
+                              h('button',{className:'cdp-cancel',onClick:cancelCalendarCreate},'Отмена'),
+                              h('button',{className:'add-b',style:{padding:'5px 12px',fontSize:12},onClick:saveCalendarTask},'Сохранить')
+                            )
+                          ]
+                        : h('button',{className:'add-b',style:{width:'100%',marginLeft:0},onClick:()=>openCalendarCreate(calSel)},'+ Добавить задачу')
+                    )
+                  )
+                : h('div',{className:'cdp-hint'},
+                    h('div',{style:{fontSize:28,marginBottom:10}},'👆'),
+                    h('div',null,'Выбери день в календаре'),
+                    h('div',{style:{fontSize:11,color:'var(--t3)',marginTop:4,fontFamily:'JetBrains Mono,monospace'}},'чтобы увидеть задачи и добавить новые')
+                  )
+            )
+          )
+        ),
+
+      // BOTTOM DETAIL PANEL
+      h('div',{ref:detailRef},
+        h(TaskDetailPanel,{
+          task:selectedTask,
+          listOptions,
+          getTaskList,
+          onUpdate:updTask,
+          onToggle:toggleTask,
+          onAddSub:addSub,
+          onToggleSub:togSub,
+          onEditSub:editSub,
+          subInp,
+          setSubInp,
+          onAttach:handleAttach,
+          onDropFile:handleFileDrop,
+          onDeleteAttachment:delAttachment,
+          previewCache,
+          setPreviewCache,
+          expanded:expandedPreviews,
+          setExpanded:setExpandedPreviews,
+          onOpenAttachment:openAttachment,
+          onShowAttachmentInFinder:showAttachmentInFinder,
+          onStartAttachmentDrag:startAttachmentDrag
+        })
+      )
+      )
+    )
+  );
+}
+
+/* ── TASK CARD ── */
+function TC({t,isDrag,isDragOv,onDragStart,onDragOver,onDrop,onToggle,onDel,onSel,isSel,expSubs,setExpSubs,subInp,setSubInp,onTogSub,onAddSub,todStr,listInfo}){
+  const col=listInfo||SYSTEM_LIST;const show=expSubs[t.id];
+  const done=isTaskDone(t);
+  const cls=['tc','prio-'+t.priority,done?'done-c':'',isDrag?'drag-on':'',isDragOv?'drag-ov':'',isSel?'sel':''].filter(Boolean).join(' ');
+  const d=taskDate(t);
+  const isOv=d&&d<todStr&&!done;
+  const dl=fmtDue(t);
+  return h('div',{className:cls,draggable:true,onDragStart,onDragOver,onDrop,onClick:onSel},
+    h('button',{className:'ph'+(done?' ck':''),onClick:e=>{e.stopPropagation();onToggle()}},done?'✓':null),
+    h('div',{className:'tb2'},
+      h('div',{className:'tt'+(done?' dk':'')},t.text),
+      h('div',{className:'meta'},
+        h('span',{className:'lchip',style:{background:col.bg,color:col.accent}},col.name),
+        h('span',{className:'pdot',style:{background:PRIO_C[t.priority]}}),
+        dl&&h('span',{className:'due-chip'+(isOv?' overdue':'')},isOv?'⚠ '+dl:dl),
+        taskNote(t).trim()&&h('span',{className:'note-mc'},'📝 заметка'),
+        t.attachments?.length>0&&h('span',{className:'att-mc'},'📎 '+t.attachments.length),
+        t.subs?.length>0&&h('button',{className:'sub-mc',onClick:e=>{e.stopPropagation();setExpSubs(s=>({...s,[t.id]:!s[t.id]}))}},'◫ '+t.subs.filter(s=>s.done).length+'/'+t.subs.length)
+      ),
+      show&&t.subs?.length>0&&h('div',{className:'sub-list',onClick:e=>e.stopPropagation()},
+        t.subs.map(s=>h('div',{key:s.id,className:'sub-item'},
+          h('button',{className:'sub-ck'+(s.done?' ck':''),onClick:()=>onTogSub(t.id,s.id)},s.done?'✓':null),
+          h('span',{style:s.done?{textDecoration:'line-through',color:'var(--t3)'}:{}},s.text)
+        )),
+        h('div',{className:'add-sub'},
+          h('input',{className:'sub-inp',placeholder:'Добавить подзадачу...',value:subInp[t.id]||'',
+            onChange:e=>setSubInp(s=>({...s,[t.id]:e.target.value})),
+            onKeyDown:e=>e.key==='Enter'&&onAddSub(t.id,subInp[t.id]||'')}),
+          h('button',{className:'sub-add-btn',onClick:()=>onAddSub(t.id,subInp[t.id]||'')},' + ')
+        )
+      )
+    ),
+    h('div',{className:'tah',onClick:e=>e.stopPropagation()},
+      h('button',{className:'act-btn del',onClick:onDel},'🗑')
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

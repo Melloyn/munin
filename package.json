@@ -1,0 +1,37 @@
+{
+  "name": "munin",
+  "version": "2.0.0",
+  "description": "Munin — персональный планировщик задач",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.munin.app",
+    "productName": "Munin",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "src/assets/icon.png",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "title": "Munin Installer",
+      "backgroundColor": "#0f0f11",
+      "window": { "width": 540, "height": 380 }
+    },
+    "files": ["main.js", "preload.js", "src/**/*"],
+    "asar": true
+  },
+  "dependencies": {
+    "mammoth": "^1.8.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}
