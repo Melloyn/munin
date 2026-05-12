@@ -1000,13 +1000,8 @@ function App(){
   const selectedTask=useMemo(()=>tasks.find(t=>String(t.id)===String(selectedTaskId))||null,[tasks,selectedTaskId]);
   useEffect(()=>{if(selectedTaskId&&!selectedTask)setSelectedTaskId(null);},[selectedTaskId,selectedTask]);
   const selectTask=useCallback((id,{scroll=false}={})=>{
-    let shouldScroll=false;
-    setSelectedTaskId(current=>{
-      const isSame=String(current)===String(id);
-      shouldScroll=scroll&&!isSame;
-      return isSame?null:id;
-    });
-    if(scroll)requestAnimationFrame(()=>{if(shouldScroll)detailRef.current?.scrollIntoView({behavior:'smooth',block:'start'});});
+    setSelectedTaskId(id);
+    if(scroll)requestAnimationFrame(()=>{detailRef.current?.scrollIntoView({behavior:'smooth',block:'start'});});
   },[]);
 
   useEffect(()=>{
