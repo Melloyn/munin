@@ -182,25 +182,30 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 
 /* CALENDAR VIEW */
 .cal-view{flex:0 0 auto;display:flex;flex-direction:column;overflow:visible}
-.cal-header{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--b1);flex-shrink:0}
+.cal-header{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--b1);flex-shrink:0;flex-wrap:wrap}
 .cal-nav{width:28px;height:28px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);cursor:pointer;color:var(--t2);font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .cal-nav:hover{background:var(--s3);color:var(--t1)}
-.cal-m-lbl{font-size:16px;font-weight:700;min-width:160px}
+.cal-m-lbl{font-size:16px;font-weight:700;min-width:150px}
 .cal-today-b{padding:4px 12px;border-radius:var(--rs);border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;font-weight:500;transition:all .15s}
 .cal-today-b:hover{background:var(--s3);color:var(--t1)}
+.cal-selected-summary{margin-left:auto;font-size:12px;color:var(--am);font-family:'JetBrains Mono',monospace;white-space:nowrap}
 .cal-wrap{flex:1;overflow:hidden;padding:0 16px 12px;display:flex;flex-direction:column}
 .cal-grid-col{flex:1;overflow:hidden;padding:0 16px 12px;display:flex;flex-direction:column}
 .cal-wds{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
 .cal-wd{text-align:center;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.06em;padding:4px 0}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr);gap:2px;flex:1}
-.cal-cell{border-radius:8px;border:1px solid var(--b1);background:var(--s1);padding:5px 6px;display:flex;flex-direction:column;overflow:hidden;cursor:pointer;transition:background .15s;min-height:0}
+.cal-cell{border-radius:8px;border:1px solid var(--b1);background:var(--s1);padding:5px 6px;display:flex;flex-direction:column;overflow:hidden;cursor:pointer;transition:background .15s,border-color .15s;min-height:0}
 .cal-cell:hover{background:var(--s2)}
 .cal-cell.drop-day{border-color:var(--am);box-shadow:inset 0 0 0 1px var(--am);background:rgba(245,158,11,.08)}
 .cal-cell.other{opacity:.3}
 .cal-cell.today-c{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.06)}
-.cal-cell.sel-c{border-color:var(--am)}
-.cal-dn{font-size:11px;font-weight:600;color:var(--t2);margin-bottom:2px;line-height:1}
+.cal-cell.has-tasks{border-color:rgba(255,255,255,.14)}
+.cal-cell.sel-c{border-color:var(--am);box-shadow:inset 0 0 0 1px var(--am-d)}
+.cal-dn-row{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px;min-height:13px}
+.cal-dn{font-size:11px;font-weight:600;color:var(--t2);line-height:1}
 .cal-cell.today-c .cal-dn{color:var(--am)}
+.cal-count{min-width:14px;height:14px;border-radius:999px;background:var(--s3);color:var(--t3);font-size:9px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.cal-cell.has-tasks .cal-count{background:var(--am-d);color:var(--am)}
 .cal-pill{font-size:10px;padding:1px 4px;border-radius:3px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;line-height:1.4;cursor:grab}
 .cal-more{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
 
@@ -216,10 +221,12 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 .cdp-tasks{flex:0 0 auto;overflow:visible;padding:8px 10px}
 .cdp-tasks::-webkit-scrollbar{width:2px}
 .cdp-tasks::-webkit-scrollbar-thumb{background:var(--s3)}
-.cdp-task{display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-radius:8px;border:1px solid var(--b1);background:var(--s2);margin-bottom:4px;cursor:pointer;transition:all .15s}
+.cdp-task{display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-radius:8px;border:1px solid var(--b1);background:var(--s2);margin-bottom:4px;transition:all .15s}
 .cdp-task:hover{background:var(--s3);border-color:var(--b2)}
 .cdp-task.cdp-done{opacity:.42}
-.cdp-task-t{font-size:13px;font-weight:500;color:var(--t1);line-height:1.35}
+.cdp-task-main{flex:1;min-width:0;display:flex;align-items:flex-start;gap:8px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.cdp-task-main:focus-visible{outline:1px solid var(--am);outline-offset:3px;border-radius:6px}
+.cdp-task-t{font-size:13px;font-weight:500;color:var(--t1);line-height:1.35;overflow-wrap:anywhere}
 .cdp-task-t.dk{text-decoration:line-through;color:var(--t3)}
 .cdp-empty{text-align:center;padding:30px 0;color:var(--t3);font-size:22px;display:flex;flex-direction:column;align-items:center;gap:8px}
 .cdp-empty div{font-size:13px}
@@ -1466,7 +1473,7 @@ function App(){
             h('button',{className:'cal-nav',onClick:()=>setCalM(({y,m})=>m===11?{y:y+1,m:0}:{y,m:m+1})},'›'),
             h('span',{className:'cal-m-lbl'},RU_MONTHS[calM.m]+' '+calM.y),
             h('button',{className:'cal-today-b',onClick:()=>{const d=new Date();setCalM({y:d.getFullYear(),m:d.getMonth()});setCalSel(toDS(tod()));setCalendarDraft(null);}},'Сегодня'),
-            calSel&&h('span',{style:{marginLeft:'auto',fontSize:12,color:'var(--am)',fontFamily:'JetBrains Mono,monospace'}},
+            calSel&&h('span',{className:'cal-selected-summary'},
               fmtD(calSel)+' · '+(tasksByDate[calSel]||[]).length+' задач')
           ),
           h('div',{className:'cal-body'},
@@ -1478,16 +1485,26 @@ function App(){
                   const ds=toDS(date);const isT=sameD(date,tod());const isS=calSel&&ds===calSel;
                   const ct=(tasksByDate[ds]||[]);const shown=ct.slice(0,2);const more=ct.length-shown.length;
                   return h('div',{key:i,
-                    className:'cal-cell'+(other?' other':'')+(isT?' today-c':'')+(isS?' sel-c':'')+(dropDay===ds?' drop-day':''),
+                    className:'cal-cell'+(other?' other':'')+(ct.length?' has-tasks':'')+(isT?' today-c':'')+(isS?' sel-c':'')+(dropDay===ds?' drop-day':''),
+                    title:fmtD(ds)+(ct.length?' · задач: '+ct.length:''),
                     onDragOver:e=>onDayDragOver(e,ds),
                     onDragLeave:e=>onDayDragLeave(e,ds),
                     onDrop:e=>onDayDrop(e,ds),
                     onClick:()=>{setCalSel(ds);setSelectedTaskId(null);setCalendarDraft(null);}},
-                    h('div',{className:'cal-dn'},date.getDate()),
+                    h('div',{className:'cal-dn-row'},
+                      h('div',{className:'cal-dn'},date.getDate()),
+                      ct.length>0&&h('span',{className:'cal-count'},ct.length)
+                    ),
                     ...shown.map(t=>h('div',{key:t.id,className:'cal-pill'+(String(selectedTaskId)===String(t.id)?' sel':''),
+                      role:'button',
+                      tabIndex:0,
+                      'aria-label':'Открыть детали задачи '+t.text,
                       draggable:true,
                       onDragStart:e=>{e.stopPropagation();onDragStart(e,t.id)},
                       onDragEnd:e=>{e.stopPropagation();setDragId(null);setDropDay(null)},
+                      onKeyDown:e=>{
+                        if(e.key==='Enter'||e.key===' '){e.stopPropagation();e.preventDefault();selectTask(t.id);}
+                      },
                       onClick:e=>{e.stopPropagation();selectTask(t.id);},
                       style:{background:getTaskList(t).bg||'var(--s3)',color:getTaskList(t).accent||'var(--t2)',opacity:isTaskDone(t)?0.5:1},
                       title:t.text},taskTime(t)?taskTime(t)+' · '+t.text:t.text)),
@@ -1510,32 +1527,33 @@ function App(){
                     ),
                     // Список задач дня
                     h('div',{className:'cdp-tasks'},
-                      (tasksByDate[calSel]||[]).length===0
-                        ? h('div',{className:'cdp-empty'},'✦',h('div',null,'Задач нет'))
-                        : (tasksByDate[calSel]||[]).map(t=>
-                            h('div',{key:t.id,
-                              className:'cdp-task'+(isTaskDone(t)?' cdp-done':'')+(String(selectedTaskId)===String(t.id)?' sel':''),
-                              draggable:true,
-                              onDragStart:e=>onDragStart(e,t.id),
-                              onDragEnd:()=>{setDragId(null);setDropDay(null)},
-                              onClick:()=>selectTask(t.id)},
-                              h('button',{
-                                className:'ph'+(isTaskDone(t)?' ck':''),
-                                style:{width:16,height:16,fontSize:9,flexShrink:0,marginTop:1},
-                                onClick:e=>{e.stopPropagation();toggleTask(t.id)}},
-                                isTaskDone(t)?'✓':null),
-                              h('div',{style:{flex:1,minWidth:0}},
-                                h('div',{className:'cdp-task-t'+(isTaskDone(t)?' dk':'')},t.text),
-                                h('div',{style:{display:'flex',gap:5,marginTop:3,flexWrap:'wrap'}},
-                                  taskTime(t)&&h('span',{className:'due-chip'},taskTime(t)),
-                                  h('span',{className:'lchip',style:{fontSize:10,background:getTaskList(t).bg,color:getTaskList(t).accent}},getTaskList(t).name),
-                                  h('span',{className:'pdot',style:{background:PRIO_C[t.priority]}})
-                                )
-                              ),
-                              t.attachments?.length>0&&h('span',{style:{fontSize:10,color:'var(--blue)'}},
-                                '📎'+t.attachments.length)
-                            )
-                          )
+	                      (tasksByDate[calSel]||[]).length===0
+	                        ? h('div',{className:'cdp-empty'},'✦',h('div',null,'Задач нет'))
+	                        : (tasksByDate[calSel]||[]).map(t=>
+	                            h('div',{key:t.id,
+	                              className:'cdp-task'+(isTaskDone(t)?' cdp-done':'')+(String(selectedTaskId)===String(t.id)?' sel':''),
+	                              draggable:true,
+	                              onDragStart:e=>onDragStart(e,t.id),
+	                              onDragEnd:()=>{setDragId(null);setDropDay(null)}},
+	                              h('button',{
+	                                className:'ph'+(isTaskDone(t)?' ck':''),
+	                                style:{width:16,height:16,fontSize:9,flexShrink:0,marginTop:1},
+	                                onClick:e=>{e.stopPropagation();toggleTask(t.id)}},
+	                                isTaskDone(t)?'✓':null),
+	                              h('button',{type:'button',className:'cdp-task-main',onClick:()=>selectTask(t.id)},
+	                                h('div',{style:{flex:1,minWidth:0}},
+	                                  h('div',{className:'cdp-task-t'+(isTaskDone(t)?' dk':'')},t.text),
+	                                  h('div',{style:{display:'flex',gap:5,marginTop:3,flexWrap:'wrap'}},
+	                                    taskTime(t)&&h('span',{className:'due-chip'},taskTime(t)),
+	                                    h('span',{className:'lchip',style:{fontSize:10,background:getTaskList(t).bg,color:getTaskList(t).accent}},getTaskList(t).name),
+	                                    h('span',{className:'pdot',style:{background:PRIO_C[t.priority]}})
+	                                  )
+	                                ),
+	                                t.attachments?.length>0&&h('span',{style:{fontSize:10,color:'var(--blue)'}},
+	                                  '📎'+t.attachments.length)
+	                              )
+	                            )
+	                          )
                     ),
                     // Поле добавления задачи в этот день
                     h('div',{className:'cdp-add'},
