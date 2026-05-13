@@ -1064,6 +1064,22 @@ function App(){
     });
   },[persistLater]);
 
+  const exportBackup=async()=>{
+    if(!window.muninAPI?.exportBackup){alert('Экспорт доступен только в Electron-приложении.');return;}
+    const snapshot={version:2,tasks:tasksRef.current,lists:listsRef.current};
+    try{
+      clearTimeout(saveTimer.current);
+      await saveStorage(snapshot.tasks,snapshot.lists);
+      setSaved(true);
+      const r=await window.muninAPI.exportBackup(snapshot);
+      if(r?.canceled)return;
+      if(!r?.ok){alert(r?.error||'Не удалось создать резервную копию.');return;}
+      alert('Резервная копия создана:\n'+r.exportDir+'\n\nВложений скопировано: '+(r.copiedAttachments||0)+(r.missingAttachments?'\nНе найдено вложений: '+r.missingAttachments:''));
+    }catch(e){
+      alert(e?.message||'Не удалось создать резервную копию.');
+    }
+  };
+
   const updTask=(id,p)=>setTasks(t=>t.map(x=>String(x.id)===String(id)?{...x,...p}:x));
   const toggleTask=(id)=>{
     setTasks(prev=>prev.map(task=>{
@@ -1339,6 +1355,7 @@ function App(){
         h('div',{className:'sb-foot'},
           h('div',{className:'prog-row'},h('span',null,'Сегодня'),h('span',{className:'prog-am'},pct+'%')),
           h('div',{className:'prog-track'},h('div',{className:'prog-fill',style:{width:pct+'%'}})),
+          h('button',{className:'close-b',style:{marginTop:10},onClick:exportBackup},'Экспорт резервной копии'),
           h('div',{className:'save-ind'},saved?h('span',{className:'save-ok'},'● сохранено'):h('span',null,'● сохранение...'))
         )
       ),

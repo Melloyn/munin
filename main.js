@@ -121,6 +121,93 @@ function copyAttachment(srcPath) {
   return attachmentMeta(srcPath, dest, id);
 }
 
+function backupTimestamp() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+}
+
+function uniqueBackupDir(parentDir) {
+  const base = `Munin Backup ${backupTimestamp()}`;
+  let candidate = path.join(parentDir, base);
+  let idx = 2;
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(parentDir, `${base} ${idx}`);
+    idx += 1;
+  }
+  return candidate;
+}
+
+function uniqueBackupFileName(dir, preferredName) {
+  const parsed = path.parse(preferredName || `attachment_${makeAttachmentId()}`);
+  const base = (parsed.name || 'attachment').replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').slice(0, 120) || 'attachment';
+  const ext = parsed.ext || '';
+  let name = `${base}${ext}`;
+  let candidate = path.join(dir, name);
+  let idx = 2;
+  while (fs.existsSync(candidate)) {
+    name = `${base}_${idx}${ext}`;
+    candidate = path.join(dir, name);
+    idx += 1;
+  }
+  return { name, path: candidate };
+}
+
+function collectBackupAttachments(tasks) {
+  const seen = new Set();
+  const result = [];
+  const invalid = [];
+  for (const task of Array.isArray(tasks) ? tasks : []) {
+    const taskId = task && typeof task === 'object' ? task.id : null;
+    for (const att of Array.isArray(task?.attachments) ? task.attachments : []) {
+      if (!att || typeof att !== 'object' || Array.isArray(att)) {
+        invalid.push({ taskId, reason: 'Некорректные метаданные вложения.' });
+        continue;
+      }
+      const key = att.id || att.storedName || att.path || att.filePath;
+      if (!key) {
+        invalid.push({
+          taskId,
+          originalName: att.originalName || att.name || null,
+          reason: 'Не найден id, storedName или path вложения.'
+        });
+        continue;
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({ taskId, key: String(key), attachment: att });
+    }
+  }
+  return { valid: result, invalid };
+}
+
+function sanitizeAttachmentForBackup(att, backupRelativePath) {
+  const safe = {};
+  for (const key of ['id','originalName','name','storedName','mime','type','ext','size','createdAt']) {
+    if (att && Object.prototype.hasOwnProperty.call(att, key)) safe[key] = att[key];
+  }
+  if (backupRelativePath) {
+    safe.backupRelativePath = backupRelativePath;
+    safe.path = backupRelativePath;
+  }
+  return safe;
+}
+
+function sanitizeTasksForBackup(tasks, attachmentPathMap) {
+  return (Array.isArray(tasks) ? tasks : []).map(task => {
+    if (!task || typeof task !== 'object' || Array.isArray(task)) return task;
+    const copy = { ...task };
+    copy.attachments = (Array.isArray(task.attachments) ? task.attachments : []).map(att => {
+      if (!att || typeof att !== 'object' || Array.isArray(att)) return null;
+      const key = att.id || att.storedName || att.path || att.filePath;
+      if (!key) return sanitizeAttachmentForBackup(att, null);
+      const backupRelativePath = attachmentPathMap.get(String(key)) || null;
+      return sanitizeAttachmentForBackup(att, backupRelativePath);
+    }).filter(Boolean);
+    return copy;
+  });
+}
+
 function isLikelyBinary(buffer) {
   if (!buffer.length) return false;
   if (buffer.includes(0)) return true;
@@ -253,6 +340,84 @@ ipcMain.handle('load-tasks', async () => {
 ipcMain.handle('save-tasks', async (_, tasks) => {
   try { fs.writeFileSync(dataPath, JSON.stringify(tasks, null, 2), 'utf8'); return { ok: true }; }
   catch(e) { return { ok: false }; }
+});
+
+ipcMain.handle('export-backup', async (_, snapshot) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Выберите папку для резервной копии Munin',
+    properties: ['openDirectory', 'createDirectory']
+  });
+  if (canceled || !filePaths.length) return { ok: false, canceled: true };
+
+  try {
+    const tasks = Array.isArray(snapshot?.tasks) ? snapshot.tasks : [];
+    const lists = Array.isArray(snapshot?.lists) ? snapshot.lists : [];
+    const exportDir = uniqueBackupDir(filePaths[0]);
+    const exportAttachmentsDir = path.join(exportDir, 'attachments');
+    fs.mkdirSync(exportAttachmentsDir, { recursive: true });
+
+    const copiedAttachments = [];
+    const missingAttachments = [];
+    const collectedAttachments = collectBackupAttachments(tasks);
+    const invalidAttachments = [...collectedAttachments.invalid];
+    const attachmentPathMap = new Map();
+    for (const item of collectedAttachments.valid) {
+      const att = item.attachment;
+      const resolved = resolveAttachmentFile(att);
+      if (!resolved.ok) {
+        missingAttachments.push({
+          taskId: item.taskId,
+          id: att.id || null,
+          originalName: att.originalName || att.name || null,
+          storedName: att.storedName || null,
+          error: resolved.error
+        });
+        continue;
+      }
+      const preferredName = att.storedName || path.basename(resolved.path);
+      const dest = uniqueBackupFileName(exportAttachmentsDir, preferredName);
+      fs.copyFileSync(resolved.path, dest.path);
+      const backupRelativePath = path.posix.join('attachments', dest.name);
+      attachmentPathMap.set(item.key, backupRelativePath);
+      copiedAttachments.push({
+        taskId: item.taskId,
+        id: att.id || null,
+        originalName: att.originalName || att.name || null,
+        storedName: att.storedName || path.basename(resolved.path),
+        backupRelativePath,
+        size: fs.statSync(dest.path).size
+      });
+    }
+    const exportedTasks = sanitizeTasksForBackup(tasks, attachmentPathMap);
+
+    const backup = {
+      app: 'Munin',
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      data: {
+        version: 2,
+        tasks: exportedTasks,
+        lists
+      },
+      attachments: {
+        included: true,
+        copied: copiedAttachments,
+        missing: missingAttachments,
+        invalid: invalidAttachments
+      }
+    };
+    const jsonPath = path.join(exportDir, 'munin-backup.json');
+    fs.writeFileSync(jsonPath, JSON.stringify(backup, null, 2), 'utf8');
+    return {
+      ok: true,
+      exportDir,
+      jsonPath,
+      copiedAttachments: copiedAttachments.length,
+      missingAttachments: missingAttachments.length
+    };
+  } catch (e) {
+    return { ok: false, error: e.message || 'Не удалось создать резервную копию.' };
+  }
 });
 
 ipcMain.handle('attach-file', async (_, taskId) => {
