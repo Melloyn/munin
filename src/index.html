@@ -310,11 +310,11 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 .note-textarea::placeholder{color:var(--t3)}
 .preview-card{border:1px solid var(--b1);background:var(--s2);border-radius:8px;overflow:hidden;cursor:grab}
 .preview-card:active{cursor:grabbing}
-.preview-card-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--b1)}
+.preview-card-head{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid var(--b1)}
 .preview-card-title{flex:1;min-width:0}
 .preview-card-name{font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .preview-card-meta{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
-.preview-card-actions{display:flex;gap:6px;flex-shrink:0}
+.preview-card-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:0 1 auto;max-width:360px}
 .preview-card-drag{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:2px}
 .preview-body{max-height:420px;overflow:auto;padding:10px;background:var(--bg)}
 .preview-body.expanded{max-height:720px}
@@ -396,8 +396,16 @@ const isTodayDateString=dateString=>compareDateStringsLocal(dateString,toDS(tod(
 const isFutureDateString=dateString=>!!dateString&&compareDateStringsLocal(dateString,toDS(tod()))>0;
 const fmtD=d=>{const ld=parseLocalDate(d);return ld?ld.toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):''};
 const fmtWeekday=d=>{const ld=parseLocalDate(d);return ld?ld.toLocaleDateString('ru-RU',{weekday:'long'}):''};
-const fmtSz=b=>{if(b>1048576)return(b/1048576).toFixed(1)+' MB';if(b>1024)return Math.round(b/1024)+' KB';return b+' B'};
+const fmtSz=b=>{const n=Number(b);if(!Number.isFinite(n)||n<0)return'размер неизвестен';if(n>1048576)return(n/1048576).toFixed(1)+' MB';if(n>1024)return Math.round(n/1024)+' KB';return n+' B'};
 const attName=f=>f?.originalName||f?.name||'Вложение';
+const fmtAttMeta=att=>{
+  const parts=[fmtSz(att?.size),(att?.ext||'?').toUpperCase()];
+  if(att?.createdAt){
+    const d=new Date(att.createdAt);
+    if(Number.isFinite(d.getTime()))parts.push('добавлено '+d.toLocaleDateString('ru-RU'));
+  }
+  return parts.join(' · ');
+};
 const attachmentIcon=att=>{
   const ext=(att?.ext||'').toLowerCase();
   const isImg=['png','jpg','jpeg','gif','webp'].includes(ext);
@@ -804,14 +812,14 @@ function AttachmentPreviewCard({taskId,att,index,expanded,setExpanded,previewCac
     className:'preview-card',
     draggable:true,
     onDragStart:e=>onStartDrag?.(att,e),
-    title:'Перетащите файл в письмо или другое приложение'
+    title:attName(att)+' — перетащите файл в Finder, письмо или другое приложение'
   },
     h('div',{className:'preview-card-head'},
       h('span',{style:{fontSize:18}},attachmentIcon(att)),
       h('div',{className:'preview-card-title'},
-        h('div',{className:'preview-card-name'},attName(att)),
-        h('div',{className:'preview-card-meta'},fmtSz(att.size)+' · '+(att.ext||'?').toUpperCase()),
-        h('div',{className:'preview-card-drag'},'Можно перетащить в письмо или другое приложение')
+        h('div',{className:'preview-card-name',title:attName(att)},attName(att)),
+        h('div',{className:'preview-card-meta'},fmtAttMeta(att)),
+        h('div',{className:'preview-card-drag'},'Перетащите в Finder, письмо или другое приложение')
       ),
       h('div',{className:'preview-card-actions'},
         h('button',{className:'v-btn',onClick:e=>{e.stopPropagation();setExpanded(c=>({...c,[id]:!isOpen}))}},isOpen?'Свернуть':'Развернуть'),
