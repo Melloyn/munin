@@ -529,12 +529,25 @@ function applyInlineNoteFormula(value, caret){
   const next=text.slice(0,caret)+result.value+text.slice(caret);
   return{value:next,caret:caret+result.value.length};
 }
+const parseDueTimeString=timeString=>{
+  const match=String(timeString||'').match(/^(\d{1,2}):(\d{2})$/);
+  if(!match)return null;
+  const h=Number(match[1]),m=Number(match[2]);
+  if(!Number.isInteger(h)||!Number.isInteger(m)||h<0||h>23||m<0||m>59)return null;
+  return {h,m,value:`${pad2(h)}:${pad2(m)}`};
+};
 const localDateTimeMs=(dateString,timeString='00:00')=>{
   const d=parseLocalDate(dateString);
   if(!d)return NaN;
-  const [h,m]=String(timeString||'00:00').split(':').map(Number);
-  d.setHours(Number.isFinite(h)?h:0,Number.isFinite(m)?m:0,0,0);
+  const time=parseDueTimeString(timeString||'00:00');
+  if(!time)return NaN;
+  d.setHours(time.h,time.m,0,0);
   return d.getTime();
+};
+const reminderKey=t=>{
+  const d=formatLocalDate(parseLocalDate(taskDate(t)));
+  const tm=parseDueTimeString(taskTime(t));
+  return d&&tm?`${d} ${tm.value}`:null;
 };
 const nowIso=()=>new Date().toISOString();
 const slugList=s=>(s||'').toString().trim().toLowerCase()
@@ -1048,7 +1061,6 @@ function App(){
   const inpRef=useRef(null);
   const detailRef=useRef(null);
   const saveTimer=useRef(null);
-  const dueNotified=useRef(new Set());
   const tasksRef=useRef([]);
   const listsRef=useRef(DEFAULT_LISTS);
 
@@ -1068,27 +1080,6 @@ function App(){
     if(scroll)requestAnimationFrame(()=>{detailRef.current?.scrollIntoView({behavior:'smooth',block:'start'});});
   },[]);
 
-  useEffect(()=>{
-    if(!loaded||!window.muninAPI)return;
-    const checkDue=()=>{
-      const now=Date.now();
-      tasks.forEach(t=>{
-        const d=taskDate(t), tm=taskTime(t);
-        if(!d||!tm||isTaskDone(t))return;
-        const key=`${t.id}:${d}:${tm}`;
-        if(dueNotified.current.has(key))return;
-        const dueAt=localDateTimeMs(d,tm);
-        if(Number.isFinite(dueAt)&&now>=dueAt&&now-dueAt<60000){
-          dueNotified.current.add(key);
-          window.muninAPI.notify({title:'Munin',body:`${t.text} · ${fmtDue(t)}`});
-        }
-      });
-    };
-    checkDue();
-    const timer=setInterval(checkDue,30000);
-    return()=>clearInterval(timer);
-  },[loaded,tasks]);
-
   const persistLater=useCallback((nextTasks,nextLists)=>{
     setSaved(false);
     clearTimeout(saveTimer.current);
@@ -1103,6 +1094,35 @@ function App(){
       return next;
     });
   },[persistLater]);
+
+  useEffect(()=>{
+    if(!loaded||!window.muninAPI)return;
+    const checkDue=()=>{
+      const now=Date.now();
+      const notified=[];
+      tasksRef.current.forEach(t=>{
+        if(isTaskDone(t))return;
+        const key=reminderKey(t);
+        if(!key||t.reminderNotifiedKey===key)return;
+        const dueAt=localDateTimeMs(taskDate(t),taskTime(t));
+        if(Number.isFinite(dueAt)&&now>=dueAt&&now-dueAt<60000){
+          window.muninAPI.notify({title:'Munin',body:`${t.text} · ${fmtDue(t)}`});
+          notified.push({id:String(t.id),key});
+        }
+      });
+      if(!notified.length)return;
+      const notifiedAt=nowIso();
+      const byId=new Map(notified.map(item=>[item.id,item.key]));
+      setTasks(prev=>prev.map(t=>{
+        const key=byId.get(String(t.id));
+        if(!key||t.reminderNotifiedKey===key)return t;
+        return {...t,reminderNotifiedKey:key,reminderNotifiedAt:notifiedAt};
+      }));
+    };
+    checkDue();
+    const timer=setInterval(checkDue,30000);
+    return()=>clearInterval(timer);
+  },[loaded,setTasks]);
 
   const setLists=useCallback((upd)=>{
     setListsR(prev=>{
