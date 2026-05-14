@@ -32,8 +32,8 @@ Munin v3.0.0-beta.1 is a public beta/test release. Use it at your own risk and m
 
 Download the correct DMG from the GitHub Release:
 
-- Apple Silicon: `Munin-3.0.0-beta.1-arm64.dmg`
-- Intel: `Munin-3.0.0-beta.1-x64.dmg`
+- Apple Silicon: [Download arm64 DMG](https://github.com/Melloyn/munin/releases/latest/download/Munin-3.0.0-beta.1-arm64.dmg)
+- Intel Mac: [Download x64 DMG](https://github.com/Melloyn/munin/releases/latest/download/Munin-3.0.0-beta.1-x64.dmg)
 
 Open the DMG and drag `Munin.app` to Applications.
 
