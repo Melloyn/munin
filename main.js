@@ -11,6 +11,7 @@ const dataDir  = app.getPath('userData');
 const dataPath = path.join(dataDir, 'tasks.json');
 const attDir   = path.join(dataDir, 'attachments');
 const dragIconPath = path.join(__dirname, 'src', 'assets', 'icon.png');
+const dragTempDir = path.join(app.getPath('temp'), 'munin-drag');
 
 if (!fs.existsSync(attDir)) fs.mkdirSync(attDir, { recursive: true });
 
@@ -92,6 +93,72 @@ function resolveAttachmentFile(fileRef) {
     if (e.code === 'EACCES' || e.code === 'EPERM') return { ok: false, error: 'Нет доступа к файлу вложения.' };
     return { ok: false, error: e.message || 'Не удалось получить файл вложения.' };
   }
+}
+
+function cleanDragFilename(value) {
+  if (typeof value !== 'string') return '';
+  let name = value.replace(/\\/g, '/').split('/').pop().trim();
+  name = name.replace(/[\x00-\x1F\x7F:]/g, '_');
+  if (!name || name === '.' || name === '..' || /^\.+$/.test(name)) return '';
+
+  const maxLen = 180;
+  if (name.length > maxLen) {
+    const ext = path.extname(name);
+    const stem = name.slice(0, name.length - ext.length);
+    const extPart = ext.length < 32 ? ext : '';
+    name = stem.slice(0, maxLen - extPart.length) + extPart;
+  }
+  return name;
+}
+
+function dragDisplayFilename(fileRef, resolvedPath) {
+  const ref = typeof fileRef === 'object' && fileRef ? fileRef : {};
+  const name = (
+    cleanDragFilename(ref.originalName) ||
+    cleanDragFilename(ref.name) ||
+    cleanDragFilename(ref.fileName) ||
+    cleanDragFilename(path.basename(resolvedPath)) ||
+    'attachment'
+  );
+  const sourceExt = path.extname(resolvedPath);
+  if (sourceExt && !path.extname(name)) {
+    return cleanDragFilename(name + sourceExt) || name;
+  }
+  return name;
+}
+
+function cleanupDragTemp(maxAgeMs = 24 * 60 * 60 * 1000) {
+  try {
+    if (!fs.existsSync(dragTempDir)) return;
+    const now = Date.now();
+    for (const entry of fs.readdirSync(dragTempDir, { withFileTypes: true })) {
+      const entryPath = path.join(dragTempDir, entry.name);
+      try {
+        const stat = fs.statSync(entryPath);
+        if (now - stat.mtimeMs > maxAgeMs) {
+          fs.rmSync(entryPath, { recursive: true, force: true });
+        }
+      } catch (_) {
+        // Ignore cleanup failures; stale drag files are non-critical temp data.
+      }
+    }
+  } catch (_) {
+    // Ignore cleanup failures; drag-out can continue without temp pruning.
+  }
+}
+
+function createDragOutCopy(fileRef, sourcePath) {
+  cleanupDragTemp();
+  const folder = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+  const dragFolder = path.join(dragTempDir, folder);
+  fs.mkdirSync(dragFolder, { recursive: true });
+  const fileName = dragDisplayFilename(fileRef, sourcePath);
+  const destPath = path.join(dragFolder, fileName);
+  if (!path.resolve(destPath).startsWith(path.resolve(dragFolder) + path.sep)) {
+    throw new Error('Некорректное имя файла для перетаскивания.');
+  }
+  fs.copyFileSync(sourcePath, destPath);
+  return destPath;
 }
 
 function attachmentMeta(srcPath, destPath, id) {
@@ -662,9 +729,10 @@ ipcMain.on('start-attachment-drag', (event, fileRef) => {
     return;
   }
   try {
+    const dragFilePath = createDragOutCopy(fileRef, resolved.path);
     event.sender.startDrag({
-      file: resolved.path,
-      icon: fs.existsSync(dragIconPath) ? dragIconPath : resolved.path
+      file: dragFilePath,
+      icon: fs.existsSync(dragIconPath) ? dragIconPath : dragFilePath
     });
     event.returnValue = { ok: true };
   } catch (e) {
@@ -690,6 +758,7 @@ ipcMain.handle('notify', async (_, { title, body }) => {
 });
 
 app.whenReady().then(() => {
+  cleanupDragTemp(0);
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
