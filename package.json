@@ -1,6 +1,6 @@
 {
   "name": "munin",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Munin — персональный планировщик задач",
   "main": "main.js",
   "scripts": {
