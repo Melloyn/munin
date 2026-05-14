@@ -12,7 +12,7 @@
     "productName": "Munin",
     "mac": {
       "category": "public.app-category.productivity",
-      "icon": "src/assets/icon.png",
+      "icon": "buildResources/icon.icns",
       "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
       "darkModeSupport": true
     },
