@@ -208,6 +208,108 @@ function sanitizeTasksForBackup(tasks, attachmentPathMap) {
   });
 }
 
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resolveBackupJsonPath(selectionPath) {
+  if (!selectionPath) return { ok: false, error: 'Файл backup не выбран.' };
+  const stat = fs.statSync(selectionPath);
+  const jsonPath = stat.isDirectory() ? path.join(selectionPath, 'munin-backup.json') : selectionPath;
+  if (!fs.existsSync(jsonPath)) return { ok: false, error: 'В выбранной папке не найден munin-backup.json.' };
+  const jsonStat = fs.statSync(jsonPath);
+  if (!jsonStat.isFile()) return { ok: false, error: 'munin-backup.json не является файлом.' };
+  return { ok: true, jsonPath, backupDir: path.dirname(jsonPath), sourceName: path.basename(jsonPath) };
+}
+
+function validateBackupRelativePath(relativePath, backupDir) {
+  if (typeof relativePath !== 'string' || !relativePath.trim()) return { ok: false, error: 'Путь вложения в backup не указан.' };
+  const converted = relativePath.replace(/\\/g, '/');
+  if (path.isAbsolute(converted) || path.win32.isAbsolute(converted)) return { ok: false, error: 'Путь вложения должен быть относительным.' };
+  if (converted.split('/').some(segment => segment === '..')) return { ok: false, error: 'Путь вложения выходит за пределы backup.' };
+  const normalized = path.posix.normalize(converted);
+  if (normalized === '.' || normalized.startsWith('../') || normalized.includes('/../')) return { ok: false, error: 'Путь вложения выходит за пределы backup.' };
+  if (!normalized.startsWith('attachments/')) return { ok: false, error: 'Путь вложения должен указывать на папку attachments backup.' };
+  const resolved = path.resolve(backupDir, ...normalized.split('/'));
+  const root = path.resolve(backupDir);
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) return { ok: false, error: 'Путь вложения выходит за пределы backup.' };
+  return { ok: true, relativePath: normalized, path: resolved };
+}
+
+function validateBackupPreview(backup, backupDir) {
+  const errors = [];
+  const warnings = [];
+  if (!isPlainObject(backup)) {
+    return { ok: false, error: 'Backup JSON должен быть объектом.' };
+  }
+  if (backup.app !== 'Munin') errors.push('Это не backup Munin.');
+  if (backup.backupVersion !== 1) errors.push('Неподдерживаемая версия backup.');
+  if (!isPlainObject(backup.data)) errors.push('В backup отсутствует объект data.');
+  const data = isPlainObject(backup.data) ? backup.data : {};
+  if (data.version !== 2) errors.push('Неподдерживаемая версия данных backup.');
+  if (!Array.isArray(data.tasks)) errors.push('В backup отсутствует массив задач.');
+  if (data.lists !== undefined && !Array.isArray(data.lists)) errors.push('Поле lists должно быть массивом.');
+  if (errors.length) return { ok: false, error: errors.join('\n') };
+
+  if (!Array.isArray(data.lists)) warnings.push('Списки отсутствуют; backup совместим с fallback-списками.');
+  const attachments = isPlainObject(backup.attachments) ? backup.attachments : {};
+  const copied = Array.isArray(attachments.copied) ? attachments.copied : [];
+  const missing = Array.isArray(attachments.missing) ? attachments.missing : [];
+  const invalid = Array.isArray(attachments.invalid) ? attachments.invalid : [];
+  if (!isPlainObject(backup.attachments)) warnings.push('Секция attachments отсутствует или повреждена.');
+
+  let copiedFilesAvailable = 0;
+  let copiedFilesMissing = 0;
+  let copiedPathsInvalid = 0;
+  copied.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      copiedPathsInvalid += 1;
+      warnings.push(`Вложение #${index + 1}: некорректная запись copied.`);
+      return;
+    }
+    const rel = entry.backupRelativePath;
+    const checked = validateBackupRelativePath(rel, backupDir);
+    if (!checked.ok) {
+      copiedPathsInvalid += 1;
+      warnings.push(`Вложение ${entry.originalName || entry.id || index + 1}: ${checked.error}`);
+      return;
+    }
+    try {
+      const stat = fs.statSync(checked.path);
+      const realRoot = fs.realpathSync(backupDir);
+      const realFile = fs.realpathSync(checked.path);
+      const insideBackup = realFile === realRoot || realFile.startsWith(realRoot + path.sep);
+      if (stat.isFile() && insideBackup) copiedFilesAvailable += 1;
+      else {
+        copiedFilesMissing += 1;
+        warnings.push(`Вложение ${entry.originalName || entry.id || index + 1}: файл backup недоступен.`);
+      }
+    } catch (e) {
+      copiedFilesMissing += 1;
+      warnings.push(`Вложение ${entry.originalName || entry.id || index + 1}: файл backup не найден.`);
+    }
+  });
+
+  return {
+    ok: true,
+    summary: {
+      app: backup.app,
+      backupVersion: backup.backupVersion,
+      exportedAt: backup.exportedAt || null,
+      dataVersion: data.version,
+      tasksCount: data.tasks.length,
+      listsCount: Array.isArray(data.lists) ? data.lists.length : 0,
+      copiedAttachments: copied.length,
+      copiedFilesAvailable,
+      copiedFilesMissing,
+      copiedPathsInvalid,
+      missingAttachments: missing.length,
+      invalidAttachments: invalid.length,
+      warnings
+    }
+  };
+}
+
 function isLikelyBinary(buffer) {
   if (!buffer.length) return false;
   if (buffer.includes(0)) return true;
@@ -340,6 +442,38 @@ ipcMain.handle('load-tasks', async () => {
 ipcMain.handle('save-tasks', async (_, tasks) => {
   try { fs.writeFileSync(dataPath, JSON.stringify(tasks, null, 2), 'utf8'); return { ok: true }; }
   catch(e) { return { ok: false }; }
+});
+
+ipcMain.handle('preview-backup', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Выберите backup Munin',
+    properties: ['openFile', 'openDirectory'],
+    filters: [
+      { name: 'Munin backup', extensions: ['json'] },
+      { name: 'Все файлы', extensions: ['*'] }
+    ]
+  });
+  if (canceled || !filePaths.length) return { ok: false, canceled: true };
+
+  try {
+    const resolved = resolveBackupJsonPath(filePaths[0]);
+    if (!resolved.ok) return resolved;
+    let backup;
+    try {
+      backup = JSON.parse(fs.readFileSync(resolved.jsonPath, 'utf8'));
+    } catch (e) {
+      return { ok: false, error: 'Не удалось прочитать backup JSON. Проверьте, что файл не повреждён.' };
+    }
+    const validation = validateBackupPreview(backup, resolved.backupDir);
+    if (!validation.ok) return { ok: false, error: validation.error };
+    return {
+      ok: true,
+      sourceName: resolved.sourceName,
+      summary: validation.summary
+    };
+  } catch (e) {
+    return { ok: false, error: e.message || 'Не удалось проверить backup.' };
+  }
 });
 
 ipcMain.handle('export-backup', async (_, snapshot) => {

@@ -797,6 +797,54 @@ function ListManager({lists,tasks,onAdd,onRename,onDelete,onClose}){
   );
 }
 
+function BackupPreviewModal({preview,onClose}){
+  const s=preview?.summary||{};
+  const exportedAt=(()=>{
+    if(!s.exportedAt)return '—';
+    const date=new Date(s.exportedAt);
+    return Number.isNaN(date.getTime())?'—':date.toLocaleString('ru-RU');
+  })();
+  const rows=[
+    ['Приложение',s.app||'—'],
+    ['Backup version',s.backupVersion??'—'],
+    ['Дата экспорта',exportedAt],
+    ['Data version',s.dataVersion??'—'],
+    ['Задач',s.tasksCount??0],
+    ['Списков',s.listsCount??0],
+    ['Вложений в backup',s.copiedAttachments??0],
+    ['Файлов найдено',s.copiedFilesAvailable??0],
+    ['Файлов не найдено',s.copiedFilesMissing??0],
+    ['Некорректных путей',s.copiedPathsInvalid??0],
+    ['Missing metadata',s.missingAttachments??0],
+    ['Invalid metadata',s.invalidAttachments??0]
+  ];
+  const warnings=Array.isArray(s.warnings)?s.warnings:[];
+  return h('div',{className:'modal',onClick:e=>{if(e.target===e.currentTarget)onClose()}},
+    h('div',{className:'modal-box'},
+      h('div',{className:'modal-head'},
+        h('div',{className:'modal-title'},'Проверка backup'),
+        h('button',{className:'viewer-close',onClick:onClose},'✕')
+      ),
+      h('div',{className:'modal-body'},
+        h('div',{className:'list-help',style:{marginTop:0,marginBottom:10}},
+          'Предпросмотр только проверяет файл backup. Данные Munin не изменяются.'),
+        h('div',{className:'list-help',style:{marginBottom:10,fontFamily:'JetBrains Mono,monospace'}},
+          preview?.sourceName||'munin-backup.json'),
+        rows.map(([label,value])=>h('div',{key:label,className:'list-row',style:{gridTemplateColumns:'1fr auto'}},
+          h('div',{style:{fontSize:12,color:'var(--t3)'}},label),
+          h('div',{style:{fontSize:12,color:'var(--t1)',fontFamily:'JetBrains Mono,monospace'}},String(value))
+        )),
+        warnings.length>0&&h('div',{className:'list-error'},'Предупреждения:',h('br'),
+          warnings.slice(0,8).map((w,i)=>h('div',{key:i},'• '+w)),
+          warnings.length>8&&h('div',null,'• … ещё '+(warnings.length-8))
+        ),
+        h('div',{className:'dp-sep',style:{margin:'12px 0'}}),
+        h('button',{className:'v-btn primary',onClick:onClose},'Закрыть')
+      )
+    )
+  );
+}
+
 function AttachmentPreviewCard({taskId,att,index,expanded,setExpanded,previewCache,setPreviewCache,onOpen,onShowInFinder,onStartDrag,onDelete}){
   const id=att.id;
   const isOpen=expanded[id]!==undefined?expanded[id]:index===0;
@@ -979,6 +1027,7 @@ function App(){
   const[selectedTaskId,setSelectedTaskId]=useState(null);
   const[viewer,setViewer]=useState(null);
   const[listMgr,setListMgr]=useState(false);
+  const[backupPreview,setBackupPreview]=useState(null);
   const[previewCache,setPreviewCache]=useState({});
   const[expandedPreviews,setExpandedPreviews]=useState({});
   const[calM,setCalM]=useState(()=>{const d=new Date();return{y:d.getFullYear(),m:d.getMonth()}});
@@ -1077,6 +1126,18 @@ function App(){
       alert('Резервная копия создана:\n'+r.exportDir+'\n\nВложений скопировано: '+(r.copiedAttachments||0)+(r.missingAttachments?'\nНе найдено вложений: '+r.missingAttachments:''));
     }catch(e){
       alert(e?.message||'Не удалось создать резервную копию.');
+    }
+  };
+
+  const previewBackup=async()=>{
+    if(!window.muninAPI?.previewBackup){alert('Проверка backup доступна только в Electron-приложении.');return;}
+    try{
+      const r=await window.muninAPI.previewBackup();
+      if(r?.canceled)return;
+      if(!r?.ok){alert(r?.error||'Не удалось проверить backup.');return;}
+      setBackupPreview(r);
+    }catch(e){
+      alert(e?.message||'Не удалось проверить backup.');
     }
   };
 
@@ -1327,6 +1388,7 @@ function App(){
   return h('div',{className:'app'},
     viewer&&h(FileViewer,{file:viewer,onClose:()=>setViewer(null)}),
     listMgr&&h(ListManager,{lists,tasks,onAdd:addList,onRename:renameList,onDelete:deleteList,onClose:()=>setListMgr(false)}),
+    backupPreview&&h(BackupPreviewModal,{preview:backupPreview,onClose:()=>setBackupPreview(null)}),
     h('div',{className:'titlebar'},h('span',null,'Munin')),
     h('div',{className:'body'},
 
@@ -1355,6 +1417,7 @@ function App(){
         h('div',{className:'sb-foot'},
           h('div',{className:'prog-row'},h('span',null,'Сегодня'),h('span',{className:'prog-am'},pct+'%')),
           h('div',{className:'prog-track'},h('div',{className:'prog-fill',style:{width:pct+'%'}})),
+          h('button',{className:'close-b',style:{marginTop:10},onClick:previewBackup},'Проверить backup'),
           h('button',{className:'close-b',style:{marginTop:10},onClick:exportBackup},'Экспорт резервной копии'),
           h('div',{className:'save-ind'},saved?h('span',{className:'save-ok'},'● сохранено'):h('span',null,'● сохранение...'))
         )

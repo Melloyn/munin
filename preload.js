@@ -3,6 +3,7 @@ contextBridge.exposeInMainWorld('muninAPI', {
   loadTasks:        ()       => ipcRenderer.invoke('load-tasks'),
   saveTasks:        (tasks)  => ipcRenderer.invoke('save-tasks', tasks),
   exportBackup:     (data)   => ipcRenderer.invoke('export-backup', data),
+  previewBackup:    ()       => ipcRenderer.invoke('preview-backup'),
   notify:           (opts)   => ipcRenderer.invoke('notify', opts),
   attachFile:       (taskId) => ipcRenderer.invoke('attach-file', taskId),
   attachDroppedFiles:(paths) => ipcRenderer.invoke('attach-dropped-files', paths),
